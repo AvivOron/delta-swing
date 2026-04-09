@@ -8,9 +8,32 @@ import logging
 from datetime import datetime, timezone
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+import requests
 import pandas as pd
-import yfinance as yf
 from supabase import create_client
+
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Accept": "application/json",
+}
+SESSION = requests.Session()
+SESSION.headers.update(HEADERS)
+
+
+def fetch_closes(ticker: str, days: int) -> pd.Series:
+    """Fetch daily closes from Yahoo Finance v8 chart API."""
+    url = (
+        f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}"
+        f"?interval=1d&range={days}d"
+    )
+    r = SESSION.get(url, timeout=15)
+    r.raise_for_status()
+    data = r.json()
+    result = data["chart"]["result"][0]
+    timestamps = result["timestamp"]
+    closes = result["indicators"]["quote"][0]["close"]
+    series = pd.Series(closes, index=pd.to_datetime(timestamps, unit="s"))
+    return series.dropna()
 
 # ── Configuration ────────────────────────────────────────────────────────────
 SUPABASE_URL: str = os.environ["SUPABASE_URL"]
@@ -92,19 +115,9 @@ def analyze_ticker(ticker: str):
     Fetch data, compute ZigZag, and return a result dict or None.
     """
     try:
-        df = yf.download(
-            ticker,
-            period=f"{LOOKBACK_DAYS}d",
-            interval="1d",
-            progress=False,
-            auto_adjust=True,
-        )
-        if df.empty or len(df) < 5:
+        closes = fetch_closes(ticker, LOOKBACK_DAYS)
+        if len(closes) < 5:
             return None
-
-        closes = df["Close"].dropna().squeeze()
-        if isinstance(closes, pd.DataFrame):
-            closes = closes.iloc[:, 0]
 
         pivots = calculate_zigzag(closes, DELTA)
 
