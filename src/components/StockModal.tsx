@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import ReactMarkdown from "react-markdown";
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -97,6 +98,9 @@ interface Props {
 export default function StockModal({ stock, onClose }: Props) {
   const [history, setHistory] = useState<ChartPoint[]>([]);
   const [loading, setLoading] = useState(true);
+  const [geminiLoading, setGeminiLoading] = useState(false);
+  const [geminiText, setGeminiText] = useState<string | null>(null);
+  const [geminiError, setGeminiError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchHistory(stock.ticker).then((data) => {
@@ -132,6 +136,33 @@ export default function StockModal({ stock, onClose }: Props) {
 
   const priceMin = history.length ? Math.min(...history.map((p) => p.price)) * 0.96 : 0;
   const priceMax = history.length ? Math.max(...history.map((p) => p.price)) * 1.04 : 0;
+
+  async function askGemini() {
+    setGeminiLoading(true);
+    setGeminiText(null);
+    setGeminiError(null);
+    try {
+      const res = await fetch("/delta-swing/api/gemini", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ticker: stock.ticker,
+          price: currentPrice,
+          isBuyZone: stock.is_buy_zone,
+          pivots,
+          swingsCount: stock.swings_count,
+          distanceFromLow,
+        }),
+      });
+      const data = await res.json();
+      if (data.error) setGeminiError(data.error);
+      else setGeminiText(data.analysis);
+    } catch {
+      setGeminiError("Failed to reach Gemini.");
+    } finally {
+      setGeminiLoading(false);
+    }
+  }
 
   const bullets: string[] = [];
   if (pivots.length >= 2) {
@@ -288,9 +319,28 @@ export default function StockModal({ stock, onClose }: Props) {
 
         {/* Signal Analysis */}
         <div className="px-6 py-4">
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
-            Signal Analysis
-          </h3>
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+              Signal Analysis
+            </h3>
+            <button
+              onClick={askGemini}
+              disabled={geminiLoading || loading}
+              className="flex items-center gap-1.5 rounded-lg border border-indigo-500/40 bg-indigo-600/10 px-3 py-1 text-xs font-medium text-indigo-300 hover:bg-indigo-600/20 hover:text-indigo-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              {geminiLoading ? (
+                <>
+                  <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                  </svg>
+                  Asking…
+                </>
+              ) : (
+                <>✦ Ask Gemini</>
+              )}
+            </button>
+          </div>
           <ul className="space-y-1.5">
             {bullets.map((b, i) => (
               <li key={i} className="flex gap-2 text-sm text-slate-300">
@@ -304,6 +354,16 @@ export default function StockModal({ stock, onClose }: Props) {
               <li className="text-sm text-slate-500">Not enough pivot data to explain signal.</li>
             )}
           </ul>
+
+          {geminiError && (
+            <p className="mt-3 text-sm text-red-400">{geminiError}</p>
+          )}
+
+          {geminiText && (
+            <div className="mt-3 rounded-xl border border-indigo-500/20 bg-indigo-950/30 px-4 py-3 text-sm text-slate-300 leading-relaxed prose prose-invert prose-sm max-w-none">
+              <ReactMarkdown>{geminiText}</ReactMarkdown>
+            </div>
+          )}
         </div>
 
         {/* Footer */}
