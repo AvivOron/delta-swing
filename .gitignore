@@ -6,10 +6,10 @@ worker/scanner.log
 worker/.env
 
 # Next.js
-dashboard/.next/
-dashboard/node_modules/
-dashboard/.env.local
-dashboard/.env
+.next/
+node_modules/
+.env.local
+.env
 
 # OS
 .DS_Store
