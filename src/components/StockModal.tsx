@@ -166,7 +166,7 @@ export default function StockModal({ stock, onClose }: Props) {
 
   const bullets: string[] = [];
   if (pivots.length >= 2) {
-    bullets.push(`${pivots.length} swing pivot${pivots.length !== 1 ? "s" : ""} detected over the last 90 days using a 5% threshold.`);
+    bullets.push(`${pivots.length} swing pivot${pivots.length !== 1 ? "s" : ""} detected over the last 180 days using a 5% threshold.`);
   }
   if (lastHigh) bullets.push(`Most recent peak: $${lastHigh.price.toFixed(2)} on ${lastHigh.date}.`);
   if (lastLow) bullets.push(`Most recent trough: $${lastLow.price.toFixed(2)} on ${lastLow.date}.`);

@@ -1,6 +1,6 @@
 """
 Delta Swing Scanner — Raspberry Pi Worker
-Scans NYSE tickers for ZigZag swing patterns and upserts results to Supabase.
+Scans NYSE and NASDAQ tickers for ZigZag swing patterns and upserts results to Supabase.
 """
 
 import os
@@ -43,8 +43,8 @@ SUPABASE_URL: str = os.environ["SUPABASE_URL"]
 SUPABASE_KEY: str = os.environ["SUPABASE_KEY"]
 
 DELTA: float = 0.05          # 5% swing threshold
-MIN_OCCURRENCES: int = 2     # minimum qualifying swings
-LOOKBACK_DAYS: int = 90      # calendar days of history to fetch
+MIN_OCCURRENCES: int = 3     # minimum qualifying swings
+LOOKBACK_DAYS: int = 180     # calendar days of history to fetch
 BUY_ZONE_TOLERANCE: float = 0.02  # within 2% of last pivot low
 MAX_WORKERS: int = 16        # tune for Pi 4/5 — IO-bound so can exceed core count
 
@@ -55,20 +55,26 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-# ── Full NYSE ticker list ─────────────────────────────────────────────────────
-try:
-    _resp = SESSION.get(
-        "https://raw.githubusercontent.com/rreichel3/US-Stock-Symbols/main/nyse/nyse_tickers.json",
-        timeout=15,
-    )
-    _resp.raise_for_status()
-    TICKERS = [
-        t.strip() for t in _resp.json()
+# ── Full NYSE + NASDAQ ticker list ───────────────────────────────────────────
+def _fetch_tickers(url: str) -> list:
+    r = SESSION.get(url, timeout=15)
+    r.raise_for_status()
+    return [
+        t.strip() for t in r.json()
         if isinstance(t, str) and t.strip() and "^" not in t and "/" not in t
     ]
-    log.info("Loaded %d NYSE tickers from remote CSV.", len(TICKERS))
+
+try:
+    nyse = _fetch_tickers(
+        "https://raw.githubusercontent.com/rreichel3/US-Stock-Symbols/main/nyse/nyse_tickers.json"
+    )
+    nasdaq = _fetch_tickers(
+        "https://raw.githubusercontent.com/rreichel3/US-Stock-Symbols/main/nasdaq/nasdaq_tickers.json"
+    )
+    TICKERS = list(dict.fromkeys(nyse + nasdaq))  # dedupe, preserve order
+    log.info("Loaded %d tickers (NYSE + NASDAQ) from remote.", len(TICKERS))
 except Exception as _e:
-    log.warning("Could not fetch NYSE CSV (%s), falling back to starter list.", _e)
+    log.warning("Could not fetch tickers (%s), falling back to starter list.", _e)
     TICKERS = [
         "AAPL", "MSFT", "GOOGL", "AMZN", "META", "TSLA", "NVDA", "JPM", "BAC",
         "WFC", "GS", "MS", "C", "USB", "PNC", "TFC", "COF", "AXP", "V", "MA",

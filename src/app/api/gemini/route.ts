@@ -17,12 +17,12 @@ export async function POST(req: NextRequest) {
 
   const prompt = `You are a financial analyst assistant. A user does NOT currently hold ${ticker} and is deciding whether to buy it now as a new position. This is a NYSE/NASDAQ-listed US stock.
 
-Here is the ZigZag technical analysis data from the last 90 days:
+Here is the ZigZag technical analysis data from the last 180 days:
 - Current price: $${price.toFixed(2)}
 - ZigZag swings detected (5% threshold): ${swingsCount}
 - Buy zone signal (within 2% above last trough): ${isBuyZone ? "YES" : "NO"}
 ${distanceFromLow !== null ? `- Distance from last trough: ${distanceFromLow.toFixed(1)}%` : ""}
-- Swing pivots (last 90 days):
+- Swing pivots (last 180 days):
 ${pivotsText || "  No pivots detected"}
 
 Based on this technical pattern AND your existing knowledge about ${ticker} (business model, sector, historical performance, known risks, any events up to your knowledge cutoff), give a direct recommendation on whether to BUY or WAIT.
