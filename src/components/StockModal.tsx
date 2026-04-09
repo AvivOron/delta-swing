@@ -78,38 +78,13 @@ async function fetchHistory(ticker: string): Promise<ChartPoint[]> {
 const DELTA = 0.05;
 const BUY_TOLERANCE = 0.02;
 
-// Custom dot renderer — shows triangle up/down at pivot points
 const PivotDot = (props: any) => {
   const { cx, cy, payload } = props;
   if (payload.pivotHigh !== undefined) {
-    // Triangle pointing up (peak)
-    return (
-      <g>
-        <polygon
-          points={`${cx},${cy - 10} ${cx - 5},${cy - 2} ${cx + 5},${cy - 2}`}
-          fill="#f59e0b"
-          opacity={0.9}
-        />
-        <text x={cx} y={cy - 13} textAnchor="middle" fontSize={9} fill="#f59e0b">
-          ${payload.pivotHigh.toFixed(0)}
-        </text>
-      </g>
-    );
+    return <circle cx={cx} cy={cy} r={4} fill="#f59e0b" stroke="#1e293b" strokeWidth={1.5} />;
   }
   if (payload.pivotLow !== undefined) {
-    // Triangle pointing down (trough)
-    return (
-      <g>
-        <polygon
-          points={`${cx},${cy + 10} ${cx - 5},${cy + 2} ${cx + 5},${cy + 2}`}
-          fill="#10b981"
-          opacity={0.9}
-        />
-        <text x={cx} y={cy + 20} textAnchor="middle" fontSize={9} fill="#10b981">
-          ${payload.pivotLow.toFixed(0)}
-        </text>
-      </g>
-    );
+    return <circle cx={cx} cy={cy} r={4} fill="#10b981" stroke="#1e293b" strokeWidth={1.5} />;
   }
   return null;
 };
@@ -135,11 +110,13 @@ export default function StockModal({ stock, onClose }: Props) {
 
   const pivots = calculateZigzag(history, DELTA);
 
-  // Merge pivot markers into chart data
+  // Merge pivot markers into chart data, and add zigzag line values
+  const pivotDates = new Set(pivots.map((p) => p.date));
   const chartData: ChartPoint[] = history.map((p) => {
     const pivot = pivots.find((pv) => pv.date === p.date);
     return {
       ...p,
+      zigzag: pivotDates.has(p.date) ? p.price : undefined,
       ...(pivot?.direction === "high" ? { pivotHigh: p.price } : {}),
       ...(pivot?.direction === "low" ? { pivotLow: p.price } : {}),
     };
@@ -206,30 +183,22 @@ export default function StockModal({ stock, onClose }: Props) {
             <>
               {/* Legend */}
               <div className="mb-2 flex flex-wrap gap-x-4 gap-y-1 px-2 text-xs text-slate-500">
-                <span className="flex items-center gap-1">
-                  <span className="inline-block h-0 w-3 border-t-2 border-indigo-400" /> Price
+                <span className="flex items-center gap-1.5">
+                  <span className="inline-block h-0.5 w-4 rounded bg-indigo-400 opacity-60" /> Price
                 </span>
-                <span className="flex items-center gap-1">
-                  <svg width="10" height="10" viewBox="0 0 10 10">
-                    <polygon points="5,0 0,8 10,8" fill="#f59e0b" />
-                  </svg>
-                  Peak
+                <span className="flex items-center gap-1.5">
+                  <span className="inline-block h-0.5 w-4 rounded bg-amber-400" /> ZigZag
                 </span>
-                <span className="flex items-center gap-1">
-                  <svg width="10" height="10" viewBox="0 0 10 10">
-                    <polygon points="5,10 0,2 10,2" fill="#10b981" />
-                  </svg>
-                  Trough
+                <span className="flex items-center gap-1.5">
+                  <span className="inline-block h-2 w-2 rounded-full bg-amber-400" /> Peak
                 </span>
-                {lastLow && (
-                  <span className="flex items-center gap-1">
-                    <span className="inline-block h-0 w-3 border-t border-dashed border-emerald-500" /> Support
-                  </span>
-                )}
+                <span className="flex items-center gap-1.5">
+                  <span className="inline-block h-2 w-2 rounded-full bg-emerald-400" /> Trough
+                </span>
               </div>
 
               <ResponsiveContainer width="100%" height={240}>
-                <ComposedChart data={chartData} margin={{ top: 16, right: 8, left: 0, bottom: 0 }}>
+                <ComposedChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="priceGrad" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#6366f1" stopOpacity={0.25} />
@@ -295,22 +264,18 @@ export default function StockModal({ stock, onClose }: Props) {
                     activeDot={{ r: 4, fill: "#6366f1" }}
                   />
 
-                  {/* Pivot markers via Line with custom dot */}
+                  {/* ZigZag line connecting pivots with colored dots */}
                   <Line
-                    dataKey="pivotHigh"
-                    stroke="none"
+                    type="linear"
+                    dataKey="zigzag"
+                    stroke="#f59e0b"
+                    strokeWidth={1.5}
+                    strokeOpacity={0.8}
                     dot={<PivotDot />}
                     activeDot={false}
                     legendType="none"
                     isAnimationActive={false}
-                  />
-                  <Line
-                    dataKey="pivotLow"
-                    stroke="none"
-                    dot={<PivotDot />}
-                    activeDot={false}
-                    legendType="none"
-                    isAnimationActive={false}
+                    connectNulls
                   />
                 </ComposedChart>
               </ResponsiveContainer>
