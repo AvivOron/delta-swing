@@ -13,15 +13,37 @@ interface StocksTableProps {
 }
 
 const PAGE_SIZE = 50;
+const FOLLOWED_STORAGE_KEY = "delta-swing-followed";
 
 export default function StocksTable({ stocks }: StocksTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>("swings_count");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
-  const [filter, setFilter] = useState<"all" | "buy">("all");
+  const [filter, setFilter] = useState<"all" | "buy" | "followed">("all");
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<StockRow | null>(null);
   const [limit, setLimit] = useState(PAGE_SIZE);
+  const [followedTickers, setFollowedTickers] = useState<Set<string>>(new Set());
   const sentinelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(FOLLOWED_STORAGE_KEY);
+      if (!stored) return;
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed)) {
+        setFollowedTickers(new Set(parsed.filter((value): value is string => typeof value === "string")));
+      }
+    } catch {
+      window.localStorage.removeItem(FOLLOWED_STORAGE_KEY);
+    }
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      FOLLOWED_STORAGE_KEY,
+      JSON.stringify(Array.from(followedTickers).sort())
+    );
+  }, [followedTickers]);
 
   const handleSort = (key: SortKey) => {
     if (key === sortKey) {
@@ -33,7 +55,11 @@ export default function StocksTable({ stocks }: StocksTableProps) {
   };
 
   const visible = stocks
-    .filter((s) => filter === "all" || s.is_buy_zone)
+    .filter((s) => {
+      if (filter === "buy") return s.is_buy_zone;
+      if (filter === "followed") return followedTickers.has(s.ticker);
+      return true;
+    })
     .filter((s) => !search || s.ticker.toUpperCase() === search.toUpperCase() || s.ticker.toUpperCase().startsWith(search.toUpperCase()))
     .sort((a, b) => {
       const av = a[sortKey];
@@ -71,6 +97,15 @@ export default function StocksTable({ stocks }: StocksTableProps) {
 
   const loadMore = useCallback(() => {
     setLimit((l) => l + PAGE_SIZE);
+  }, []);
+
+  const toggleFollow = useCallback((ticker: string) => {
+    setFollowedTickers((current) => {
+      const next = new Set(current);
+      if (next.has(ticker)) next.delete(ticker);
+      else next.add(ticker);
+      return next;
+    });
   }, []);
 
   const selectStockAtIndex = useCallback((index: number) => {
@@ -119,6 +154,8 @@ export default function StocksTable({ stocks }: StocksTableProps) {
           onClose={() => setSelected(null)}
           onPrevious={canSelectPrevious ? handleSelectPrevious : undefined}
           onNext={canSelectNext ? handleSelectNext : undefined}
+          isFollowed={followedTickers.has(selected.ticker)}
+          onToggleFollow={() => toggleFollow(selected.ticker)}
         />
       )}
 
@@ -145,6 +182,16 @@ export default function StocksTable({ stocks }: StocksTableProps) {
           >
             Buy Signals ({stocks.filter((s) => s.is_buy_zone).length})
           </button>
+          <button
+            onClick={() => setFilter("followed")}
+            className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+              filter === "followed"
+                ? "bg-amber-500 text-slate-950"
+                : "bg-slate-800 text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            Following ({followedTickers.size})
+          </button>
         </div>
         <input
           type="text"
@@ -160,8 +207,13 @@ export default function StocksTable({ stocks }: StocksTableProps) {
         <table className="w-full border-collapse text-sm">
           <thead className="border-b border-slate-700/60 bg-slate-800/40">
             <tr>
-              <th className={thClass} onClick={() => handleSort("ticker")}>
-                Ticker <SortIcon col="ticker" />
+              <th className={`${thClass} w-[13rem]`} onClick={() => handleSort("ticker")}>
+                <div className="grid grid-cols-[1.75rem_minmax(0,1fr)] items-center gap-3">
+                  <span aria-hidden="true" />
+                  <span>
+                    Ticker <SortIcon col="ticker" />
+                  </span>
+                </div>
               </th>
               <th className={thClass} onClick={() => handleSort("price")}>
                 Price <SortIcon col="price" />
@@ -193,8 +245,27 @@ export default function StocksTable({ stocks }: StocksTableProps) {
                     stock.is_buy_zone ? "bg-emerald-950/10" : ""
                   }`}
                 >
-                  <td className="px-4 py-3 font-mono font-bold text-slate-100">
-                    {stock.ticker}
+                  <td className="px-4 py-3">
+                    <div className="grid grid-cols-[1.75rem_minmax(0,1fr)] items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleFollow(stock.ticker);
+                        }}
+                        aria-label={followedTickers.has(stock.ticker) ? `Unfollow ${stock.ticker}` : `Follow ${stock.ticker}`}
+                        className={`inline-flex h-7 w-7 items-center justify-center rounded-full border text-sm transition-colors ${
+                          followedTickers.has(stock.ticker)
+                            ? "border-amber-400/50 bg-amber-500/15 text-amber-300"
+                            : "border-slate-700 text-slate-500 hover:border-slate-500 hover:text-slate-300"
+                        }`}
+                      >
+                        ★
+                      </button>
+                      <span className="font-mono font-bold text-slate-100">
+                        {stock.ticker}
+                      </span>
+                    </div>
                   </td>
                   <td className="px-4 py-3 font-mono text-slate-300">
                     ${stock.price.toFixed(2)}
@@ -238,9 +309,26 @@ export default function StocksTable({ stocks }: StocksTableProps) {
               }`}
             >
               <div className="flex items-center justify-between">
-                <span className="font-mono text-base font-bold text-slate-100">
-                  {stock.ticker}
-                </span>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleFollow(stock.ticker);
+                    }}
+                    aria-label={followedTickers.has(stock.ticker) ? `Unfollow ${stock.ticker}` : `Follow ${stock.ticker}`}
+                    className={`inline-flex h-8 w-8 items-center justify-center rounded-full border text-sm transition-colors ${
+                      followedTickers.has(stock.ticker)
+                        ? "border-amber-400/50 bg-amber-500/15 text-amber-300"
+                        : "border-slate-700 text-slate-500 hover:border-slate-500 hover:text-slate-300"
+                    }`}
+                  >
+                    ★
+                  </button>
+                  <span className="font-mono text-base font-bold text-slate-100">
+                    {stock.ticker}
+                  </span>
+                </div>
                 <StatusBadge isBuyZone={stock.is_buy_zone} />
               </div>
               <div className="mt-1.5 flex items-center gap-4 text-sm text-slate-400">

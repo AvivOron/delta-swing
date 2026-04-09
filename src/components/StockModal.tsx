@@ -107,9 +107,11 @@ interface Props {
   onClose: () => void;
   onPrevious?: () => void;
   onNext?: () => void;
+  isFollowed: boolean;
+  onToggleFollow: () => void;
 }
 
-export default function StockModal({ stock, onClose, onPrevious, onNext }: Props) {
+export default function StockModal({ stock, onClose, onPrevious, onNext, isFollowed, onToggleFollow }: Props) {
   const [history, setHistory] = useState<ChartPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [geminiLoading, setGeminiLoading] = useState(false);
@@ -276,13 +278,26 @@ export default function StockModal({ stock, onClose, onPrevious, onNext }: Props
             <span className="font-mono text-lg text-slate-400">${currentPrice.toFixed(2)}</span>
             <StatusBadge isBuyZone={stock.is_buy_zone} />
           </div>
-          <button
-            onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-colors"
-            aria-label="Close modal"
-          >
-            ✕
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onToggleFollow}
+              className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                isFollowed
+                  ? "border-amber-400/50 bg-amber-500/15 text-amber-300 hover:bg-amber-500/25"
+                  : "border-slate-700 bg-slate-800/60 text-slate-300 hover:border-slate-600 hover:bg-slate-800"
+              }`}
+            >
+              {isFollowed ? "Following" : "Follow"}
+            </button>
+            <button
+              onClick={onClose}
+              className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-colors"
+              aria-label="Close modal"
+            >
+              ✕
+            </button>
+          </div>
         </div>
 
         {/* Chart */}
