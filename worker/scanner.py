@@ -39,9 +39,9 @@ def fetch_closes(ticker: str, days: int) -> pd.Series:
 SUPABASE_URL: str = os.environ["SUPABASE_URL"]
 SUPABASE_KEY: str = os.environ["SUPABASE_KEY"]
 
-DELTA: float = 0.10          # 10% swing threshold
-MIN_OCCURRENCES: int = 3     # minimum qualifying swings
-LOOKBACK_DAYS: int = 30      # calendar days of history to fetch
+DELTA: float = 0.05          # 5% swing threshold
+MIN_OCCURRENCES: int = 2     # minimum qualifying swings
+LOOKBACK_DAYS: int = 90      # calendar days of history to fetch
 BUY_ZONE_TOLERANCE: float = 0.02  # within 2% of last pivot low
 MAX_WORKERS: int = 8         # tune for Pi 4/5 core count
 
