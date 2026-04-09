@@ -1,0 +1,15 @@
+# Python
+worker/.venv/
+worker/__pycache__/
+worker/*.pyc
+worker/scanner.log
+worker/.env
+
+# Next.js
+dashboard/.next/
+dashboard/node_modules/
+dashboard/.env.local
+dashboard/.env
+
+# OS
+.DS_Store
