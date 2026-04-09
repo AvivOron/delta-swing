@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import StatusBadge from "./StatusBadge";
+import StockModal from "./StockModal";
 import type { StockRow } from "@/lib/supabase";
 
 type SortKey = keyof Pick<StockRow, "ticker" | "price" | "swings_count">;
@@ -15,6 +16,7 @@ export default function StocksTable({ stocks }: StocksTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>("swings_count");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [filter, setFilter] = useState<"all" | "buy">("all");
+  const [selected, setSelected] = useState<StockRow | null>(null);
 
   const handleSort = (key: SortKey) => {
     if (key === sortKey) {
@@ -45,6 +47,9 @@ export default function StocksTable({ stocks }: StocksTableProps) {
 
   return (
     <div className="space-y-4">
+      {selected && (
+        <StockModal stock={selected} onClose={() => setSelected(null)} />
+      )}
       {/* Filter toggle */}
       <div className="flex items-center gap-2">
         <button
@@ -102,7 +107,8 @@ export default function StocksTable({ stocks }: StocksTableProps) {
               visible.map((stock) => (
                 <tr
                   key={stock.ticker}
-                  className={`transition-colors hover:bg-slate-800/40 ${
+                  onClick={() => setSelected(stock)}
+                  className={`cursor-pointer transition-colors hover:bg-slate-800/40 ${
                     stock.is_buy_zone ? "bg-emerald-950/10" : ""
                   }`}
                 >
