@@ -43,7 +43,7 @@ DELTA: float = 0.05          # 5% swing threshold
 MIN_OCCURRENCES: int = 2     # minimum qualifying swings
 LOOKBACK_DAYS: int = 90      # calendar days of history to fetch
 BUY_ZONE_TOLERANCE: float = 0.02  # within 2% of last pivot low
-MAX_WORKERS: int = 8         # tune for Pi 4/5 core count
+MAX_WORKERS: int = 16        # tune for Pi 4/5 — IO-bound so can exceed core count
 
 logging.basicConfig(
     level=logging.INFO,
@@ -52,20 +52,22 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-# ── Starter ticker list (replace with full NYSE fetch — see bottom) ───────────
-TICKERS = [
-    "AAPL", "MSFT", "GOOGL", "AMZN", "META", "TSLA", "NVDA", "JPM", "BAC",
-    "WFC", "GS", "MS", "C", "USB", "PNC", "TFC", "COF", "AXP", "V", "MA",
-    "UNH", "JNJ", "PFE", "MRK", "ABBV", "LLY", "BMY", "AMGN", "GILD", "CVS",
-    "XOM", "CVX", "COP", "SLB", "HAL", "BKR", "MPC", "VLO", "PSX", "OXY",
-    "WMT", "HD", "TGT", "COST", "LOW", "NKE", "SBUX", "MCD", "YUM", "DRI",
-]
-
-# ── To scan the full NYSE, uncomment the two lines below and comment out
-# the TICKERS list above:
-#
-# _df = pd.read_csv("https://raw.githubusercontent.com/rreichel3/US-Stock-Symbols/main/nyse/nyse_full_tickers.csv")
-# TICKERS = _df["Symbol"].dropna().str.strip().tolist()
+# ── Full NYSE ticker list ─────────────────────────────────────────────────────
+try:
+    _df = pd.read_csv(
+        "https://raw.githubusercontent.com/rreichel3/US-Stock-Symbols/main/nyse/nyse_full_tickers.csv"
+    )
+    TICKERS = _df["Symbol"].dropna().str.strip().tolist()
+    log.info("Loaded %d NYSE tickers from remote CSV.", len(TICKERS))
+except Exception as _e:
+    log.warning("Could not fetch NYSE CSV (%s), falling back to starter list.", _e)
+    TICKERS = [
+        "AAPL", "MSFT", "GOOGL", "AMZN", "META", "TSLA", "NVDA", "JPM", "BAC",
+        "WFC", "GS", "MS", "C", "USB", "PNC", "TFC", "COF", "AXP", "V", "MA",
+        "UNH", "JNJ", "PFE", "MRK", "ABBV", "LLY", "BMY", "AMGN", "GILD", "CVS",
+        "XOM", "CVX", "COP", "SLB", "HAL", "BKR", "MPC", "VLO", "PSX", "OXY",
+        "WMT", "HD", "TGT", "COST", "LOW", "NKE", "SBUX", "MCD", "YUM", "DRI",
+    ]
 
 
 # ── ZigZag calculation ────────────────────────────────────────────────────────
@@ -165,10 +167,17 @@ def upsert_results(client, rows: list) -> None:
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
+def clear_table(client) -> None:
+    """Delete all rows before each run so stale tickers don't persist."""
+    client.table("stocks").delete().neq("ticker", "").execute()
+    log.info("Cleared stocks table.")
+
+
 def main() -> None:
     log.info("Delta Swing Scanner starting — %d tickers", len(TICKERS))
     supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
+    clear_table(supabase)
     results = []
 
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as pool:
