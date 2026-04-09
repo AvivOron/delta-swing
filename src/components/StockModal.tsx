@@ -3,12 +3,15 @@
 import { useEffect, useState } from "react";
 import {
   ResponsiveContainer,
-  AreaChart,
+  ComposedChart,
   Area,
+  Line,
+  Scatter,
   XAxis,
   YAxis,
   Tooltip,
   ReferenceLine,
+  ReferenceDot,
 } from "recharts";
 import StatusBadge from "./StatusBadge";
 import type { StockRow } from "@/lib/supabase";
@@ -16,6 +19,8 @@ import type { StockRow } from "@/lib/supabase";
 interface ChartPoint {
   date: string;
   price: number;
+  pivotHigh?: number;
+  pivotLow?: number;
 }
 
 interface Pivot {
@@ -34,20 +39,20 @@ function calculateZigzag(data: ChartPoint[], delta: number): Pivot[] {
     const change = (point.price - lastPrice) / lastPrice;
     if (change >= delta) {
       if (lastDir !== "high") {
-        pivots.push({ ...point, direction: "high" });
+        pivots.push({ date: point.date, price: point.price, direction: "high" });
         lastDir = "high";
         lastPrice = point.price;
       } else if (point.price > lastPrice) {
-        pivots[pivots.length - 1] = { ...point, direction: "high" };
+        pivots[pivots.length - 1] = { date: point.date, price: point.price, direction: "high" };
         lastPrice = point.price;
       }
     } else if (change <= -delta) {
       if (lastDir !== "low") {
-        pivots.push({ ...point, direction: "low" });
+        pivots.push({ date: point.date, price: point.price, direction: "low" });
         lastDir = "low";
         lastPrice = point.price;
       } else if (point.price < lastPrice) {
-        pivots[pivots.length - 1] = { ...point, direction: "low" };
+        pivots[pivots.length - 1] = { date: point.date, price: point.price, direction: "low" };
         lastPrice = point.price;
       }
     }
@@ -62,14 +67,52 @@ async function fetchHistory(ticker: string): Promise<ChartPoint[]> {
   if (!result) return [];
   const timestamps: number[] = result.timestamp;
   const closes: number[] = result.indicators.quote[0].close;
-  return timestamps.map((ts, i) => ({
-    date: new Date(ts * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-    price: closes[i] ?? null,
-  })).filter((p) => p.price !== null) as ChartPoint[];
+  return timestamps
+    .map((ts, i) => ({
+      date: new Date(ts * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+      price: closes[i] ?? null,
+    }))
+    .filter((p) => p.price !== null) as ChartPoint[];
 }
 
 const DELTA = 0.05;
 const BUY_TOLERANCE = 0.02;
+
+// Custom dot renderer — shows triangle up/down at pivot points
+const PivotDot = (props: any) => {
+  const { cx, cy, payload } = props;
+  if (payload.pivotHigh !== undefined) {
+    // Triangle pointing up (peak)
+    return (
+      <g>
+        <polygon
+          points={`${cx},${cy - 10} ${cx - 5},${cy - 2} ${cx + 5},${cy - 2}`}
+          fill="#f59e0b"
+          opacity={0.9}
+        />
+        <text x={cx} y={cy - 13} textAnchor="middle" fontSize={9} fill="#f59e0b">
+          ${payload.pivotHigh.toFixed(0)}
+        </text>
+      </g>
+    );
+  }
+  if (payload.pivotLow !== undefined) {
+    // Triangle pointing down (trough)
+    return (
+      <g>
+        <polygon
+          points={`${cx},${cy + 10} ${cx - 5},${cy + 2} ${cx + 5},${cy + 2}`}
+          fill="#10b981"
+          opacity={0.9}
+        />
+        <text x={cx} y={cy + 20} textAnchor="middle" fontSize={9} fill="#10b981">
+          ${payload.pivotLow.toFixed(0)}
+        </text>
+      </g>
+    );
+  }
+  return null;
+};
 
 interface Props {
   stock: StockRow;
@@ -85,13 +128,23 @@ export default function StockModal({ stock, onClose }: Props) {
       setHistory(data);
       setLoading(false);
     });
-    // Close on Escape
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [stock.ticker, onClose]);
 
   const pivots = calculateZigzag(history, DELTA);
+
+  // Merge pivot markers into chart data
+  const chartData: ChartPoint[] = history.map((p) => {
+    const pivot = pivots.find((pv) => pv.date === p.date);
+    return {
+      ...p,
+      ...(pivot?.direction === "high" ? { pivotHigh: p.price } : {}),
+      ...(pivot?.direction === "low" ? { pivotLow: p.price } : {}),
+    };
+  });
+
   const lastLow = [...pivots].reverse().find((p) => p.direction === "low");
   const lastHigh = [...pivots].reverse().find((p) => p.direction === "high");
   const currentPrice = stock.price;
@@ -100,37 +153,20 @@ export default function StockModal({ stock, onClose }: Props) {
     ? ((currentPrice - lastLow.price) / lastLow.price) * 100
     : null;
 
-  const priceMin = history.length
-    ? Math.min(...history.map((p) => p.price)) * 0.98
-    : 0;
-  const priceMax = history.length
-    ? Math.max(...history.map((p) => p.price)) * 1.02
-    : 0;
+  const priceMin = history.length ? Math.min(...history.map((p) => p.price)) * 0.96 : 0;
+  const priceMax = history.length ? Math.max(...history.map((p) => p.price)) * 1.04 : 0;
 
-  // Explanation bullets
   const bullets: string[] = [];
   if (pivots.length >= 2) {
-    bullets.push(
-      `${pivots.length} swing pivot${pivots.length !== 1 ? "s" : ""} detected over the last 90 days using a 5% threshold.`
-    );
+    bullets.push(`${pivots.length} swing pivot${pivots.length !== 1 ? "s" : ""} detected over the last 90 days using a 5% threshold.`);
   }
-  if (lastHigh) {
-    bullets.push(`Most recent peak: $${lastHigh.price.toFixed(2)} on ${lastHigh.date}.`);
-  }
-  if (lastLow) {
-    bullets.push(`Most recent trough: $${lastLow.price.toFixed(2)} on ${lastLow.date}.`);
-  }
+  if (lastHigh) bullets.push(`Most recent peak: $${lastHigh.price.toFixed(2)} on ${lastHigh.date}.`);
+  if (lastLow) bullets.push(`Most recent trough: $${lastLow.price.toFixed(2)} on ${lastLow.date}.`);
   if (stock.is_buy_zone && distanceFromLow !== null) {
-    bullets.push(
-      `Current price $${currentPrice.toFixed(2)} is ${distanceFromLow.toFixed(1)}% above the last trough — within the 2% buy zone.`
-    );
-    bullets.push(
-      "This suggests the stock has bounced from a recent support level established by the ZigZag pattern."
-    );
+    bullets.push(`Current price $${currentPrice.toFixed(2)} is ${distanceFromLow.toFixed(1)}% above the last trough — within the 2% buy zone.`);
+    bullets.push("This suggests the stock has bounced from a recent support level established by the ZigZag pattern.");
   } else if (distanceFromLow !== null) {
-    bullets.push(
-      `Current price is ${distanceFromLow.toFixed(1)}% above the last trough — outside the 2% buy zone.`
-    );
+    bullets.push(`Current price is ${distanceFromLow.toFixed(1)}% above the last trough — outside the 2% buy zone.`);
   }
 
   return (
@@ -138,10 +174,8 @@ export default function StockModal({ stock, onClose }: Props) {
       className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4"
       onClick={onClose}
     >
-      {/* Backdrop */}
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
 
-      {/* Panel — full-width sheet on mobile, centered card on desktop */}
       <div
         className="relative z-10 w-full overflow-y-auto rounded-t-2xl border border-slate-700 bg-slate-900 shadow-2xl sm:max-w-2xl sm:rounded-2xl"
         style={{ maxHeight: "92dvh" }}
@@ -150,12 +184,8 @@ export default function StockModal({ stock, onClose }: Props) {
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-700/60 px-6 py-4">
           <div className="flex items-center gap-3">
-            <span className="font-mono text-2xl font-bold text-slate-100">
-              {stock.ticker}
-            </span>
-            <span className="font-mono text-lg text-slate-400">
-              ${currentPrice.toFixed(2)}
-            </span>
+            <span className="font-mono text-2xl font-bold text-slate-100">{stock.ticker}</span>
+            <span className="font-mono text-lg text-slate-400">${currentPrice.toFixed(2)}</span>
             <StatusBadge isBuyZone={stock.is_buy_zone} />
           </div>
           <button
@@ -167,77 +197,128 @@ export default function StockModal({ stock, onClose }: Props) {
         </div>
 
         {/* Chart */}
-        <div className="px-6 pt-4">
+        <div className="px-2 pt-4 sm:px-6">
           {loading ? (
             <div className="flex h-48 items-center justify-center text-slate-500 text-sm">
               Loading chart…
             </div>
           ) : (
-            <ResponsiveContainer width="100%" height={220}>
-              <AreaChart data={history} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="priceGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <XAxis
-                  dataKey="date"
-                  tick={{ fontSize: 10, fill: "#64748b" }}
-                  tickLine={false}
-                  axisLine={false}
-                  interval="preserveStartEnd"
-                />
-                <YAxis
-                  domain={[priceMin, priceMax]}
-                  tick={{ fontSize: 10, fill: "#64748b" }}
-                  tickLine={false}
-                  axisLine={false}
-                  tickFormatter={(v) => `$${v.toFixed(0)}`}
-                  width={52}
-                />
-                <Tooltip
-                  contentStyle={{
-                    background: "#1e293b",
-                    border: "1px solid #334155",
-                    borderRadius: 8,
-                    fontSize: 12,
-                  }}
-                  formatter={(v: number) => [`$${v.toFixed(2)}`, "Price"]}
-                />
-                {/* Buy zone band */}
+            <>
+              {/* Legend */}
+              <div className="mb-2 flex flex-wrap gap-x-4 gap-y-1 px-2 text-xs text-slate-500">
+                <span className="flex items-center gap-1">
+                  <span className="inline-block h-0 w-3 border-t-2 border-indigo-400" /> Price
+                </span>
+                <span className="flex items-center gap-1">
+                  <svg width="10" height="10" viewBox="0 0 10 10">
+                    <polygon points="5,0 0,8 10,8" fill="#f59e0b" />
+                  </svg>
+                  Peak
+                </span>
+                <span className="flex items-center gap-1">
+                  <svg width="10" height="10" viewBox="0 0 10 10">
+                    <polygon points="5,10 0,2 10,2" fill="#10b981" />
+                  </svg>
+                  Trough
+                </span>
                 {lastLow && (
-                  <ReferenceLine
-                    y={lastLow.price}
-                    stroke="#10b981"
-                    strokeDasharray="4 3"
-                    label={{ value: "support", fill: "#10b981", fontSize: 10, position: "insideTopRight" }}
-                  />
+                  <span className="flex items-center gap-1">
+                    <span className="inline-block h-0 w-3 border-t border-dashed border-emerald-500" /> Support
+                  </span>
                 )}
-                {lastLow && (
-                  <ReferenceLine
-                    y={lastLow.price * (1 + BUY_TOLERANCE)}
-                    stroke="#10b981"
-                    strokeDasharray="2 4"
-                    strokeOpacity={0.5}
-                    label={{ value: "+2%", fill: "#10b981", fontSize: 10, position: "insideTopRight" }}
+              </div>
+
+              <ResponsiveContainer width="100%" height={240}>
+                <ComposedChart data={chartData} margin={{ top: 16, right: 8, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="priceGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#6366f1" stopOpacity={0.25} />
+                      <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fontSize: 10, fill: "#64748b" }}
+                    tickLine={false}
+                    axisLine={false}
+                    interval="preserveStartEnd"
                   />
-                )}
-                <Area
-                  type="monotone"
-                  dataKey="price"
-                  stroke="#6366f1"
-                  strokeWidth={2}
-                  fill="url(#priceGrad)"
-                  dot={false}
-                  activeDot={{ r: 4, fill: "#6366f1" }}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+                  <YAxis
+                    domain={[priceMin, priceMax]}
+                    tick={{ fontSize: 10, fill: "#64748b" }}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(v) => `$${v.toFixed(0)}`}
+                    width={52}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      background: "#1e293b",
+                      border: "1px solid #334155",
+                      borderRadius: 8,
+                      fontSize: 12,
+                    }}
+                    formatter={(v: number, name: string) => {
+                      if (name === "price") return [`$${v.toFixed(2)}`, "Price"];
+                      return [null, null];
+                    }}
+                    itemSorter={() => -1}
+                  />
+
+                  {/* Support line */}
+                  {lastLow && (
+                    <ReferenceLine
+                      y={lastLow.price}
+                      stroke="#10b981"
+                      strokeDasharray="4 3"
+                      strokeOpacity={0.7}
+                    />
+                  )}
+                  {/* Buy zone upper band */}
+                  {lastLow && (
+                    <ReferenceLine
+                      y={lastLow.price * (1 + BUY_TOLERANCE)}
+                      stroke="#10b981"
+                      strokeDasharray="2 5"
+                      strokeOpacity={0.35}
+                    />
+                  )}
+
+                  {/* Price area */}
+                  <Area
+                    type="monotone"
+                    dataKey="price"
+                    stroke="#6366f1"
+                    strokeWidth={1.5}
+                    fill="url(#priceGrad)"
+                    dot={false}
+                    activeDot={{ r: 4, fill: "#6366f1" }}
+                  />
+
+                  {/* Pivot markers via Line with custom dot */}
+                  <Line
+                    dataKey="pivotHigh"
+                    stroke="none"
+                    dot={<PivotDot />}
+                    activeDot={false}
+                    legendType="none"
+                    isAnimationActive={false}
+                  />
+                  <Line
+                    dataKey="pivotLow"
+                    stroke="none"
+                    dot={<PivotDot />}
+                    activeDot={false}
+                    legendType="none"
+                    isAnimationActive={false}
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </>
           )}
         </div>
 
-        {/* Explanation */}
+        {/* Signal Analysis */}
         <div className="px-6 py-4">
           <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
             Signal Analysis
