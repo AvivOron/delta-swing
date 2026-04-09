@@ -44,15 +44,52 @@ export default function StocksTable({ stocks }: StocksTableProps) {
 
   const page = visible.slice(0, limit);
   const hasMore = limit < visible.length;
+  const selectedIndex = selected
+    ? visible.findIndex((stock) => stock.ticker === selected.ticker)
+    : -1;
+  const canSelectPrevious = selectedIndex > 0;
+  const canSelectNext = selectedIndex >= 0 && selectedIndex < visible.length - 1;
 
   // Reset limit when filters/sort change
   useEffect(() => {
     setLimit(PAGE_SIZE);
   }, [filter, search, sortKey, sortDir]);
 
+  useEffect(() => {
+    if (!selected) return;
+
+    const nextSelected = visible.find((stock) => stock.ticker === selected.ticker);
+    if (!nextSelected) {
+      setSelected(null);
+      return;
+    }
+
+    if (nextSelected !== selected) {
+      setSelected(nextSelected);
+    }
+  }, [selected, visible]);
+
   const loadMore = useCallback(() => {
     setLimit((l) => l + PAGE_SIZE);
   }, []);
+
+  const selectStockAtIndex = useCallback((index: number) => {
+    const nextStock = visible[index];
+    if (!nextStock) return;
+
+    setSelected(nextStock);
+    setLimit((currentLimit) => Math.max(currentLimit, index + 1));
+  }, [visible]);
+
+  const handleSelectPrevious = useCallback(() => {
+    if (selectedIndex <= 0) return;
+    selectStockAtIndex(selectedIndex - 1);
+  }, [selectStockAtIndex, selectedIndex]);
+
+  const handleSelectNext = useCallback(() => {
+    if (selectedIndex < 0 || selectedIndex >= visible.length - 1) return;
+    selectStockAtIndex(selectedIndex + 1);
+  }, [selectStockAtIndex, selectedIndex, visible.length]);
 
   useEffect(() => {
     const el = sentinelRef.current;
@@ -77,7 +114,12 @@ export default function StocksTable({ stocks }: StocksTableProps) {
   return (
     <div className="space-y-3">
       {selected && (
-        <StockModal stock={selected} onClose={() => setSelected(null)} />
+        <StockModal
+          stock={selected}
+          onClose={() => setSelected(null)}
+          onPrevious={canSelectPrevious ? handleSelectPrevious : undefined}
+          onNext={canSelectNext ? handleSelectNext : undefined}
+        />
       )}
 
       {/* Controls */}

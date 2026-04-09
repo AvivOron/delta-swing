@@ -93,9 +93,11 @@ const PivotDot = (props: any) => {
 interface Props {
   stock: StockRow;
   onClose: () => void;
+  onPrevious?: () => void;
+  onNext?: () => void;
 }
 
-export default function StockModal({ stock, onClose }: Props) {
+export default function StockModal({ stock, onClose, onPrevious, onNext }: Props) {
   const [history, setHistory] = useState<ChartPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [geminiLoading, setGeminiLoading] = useState(false);
@@ -103,14 +105,34 @@ export default function StockModal({ stock, onClose }: Props) {
   const [geminiError, setGeminiError] = useState<string | null>(null);
 
   useEffect(() => {
+    setLoading(true);
     fetchHistory(stock.ticker).then((data) => {
       setHistory(data);
       setLoading(false);
     });
-    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const isTypingTarget =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        !!target?.isContentEditable;
+
+      if (isTypingTarget) return;
+
+      if (e.key === "Escape") {
+        onClose();
+      } else if (e.key === "ArrowLeft" && onPrevious) {
+        e.preventDefault();
+        onPrevious();
+      } else if (e.key === "ArrowRight" && onNext) {
+        e.preventDefault();
+        onNext();
+      }
+    };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [stock.ticker, onClose]);
+  }, [stock.ticker, onClose, onPrevious, onNext]);
 
   const pivots = calculateZigzag(history, DELTA);
 
@@ -184,11 +206,36 @@ export default function StockModal({ stock, onClose }: Props) {
     >
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
 
-      <div
-        className="relative z-10 w-full overflow-y-auto rounded-t-2xl border border-slate-700 bg-slate-900 shadow-2xl sm:max-w-2xl sm:rounded-2xl"
-        style={{ maxHeight: "92dvh" }}
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="relative z-10 w-full sm:max-w-[calc(42rem+7rem)] sm:px-14">
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onPrevious?.();
+          }}
+          disabled={!onPrevious}
+          aria-label="Previous stock"
+          className="absolute left-0 top-1/2 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-slate-700/60 bg-slate-900/90 text-xl text-slate-300 shadow-lg backdrop-blur transition-colors hover:border-slate-600 hover:bg-slate-800 hover:text-slate-100 disabled:cursor-not-allowed disabled:opacity-35 sm:flex"
+        >
+          ←
+        </button>
+
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onNext?.();
+          }}
+          disabled={!onNext}
+          aria-label="Next stock"
+          className="absolute right-0 top-1/2 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-slate-700/60 bg-slate-900/90 text-xl text-slate-300 shadow-lg backdrop-blur transition-colors hover:border-slate-600 hover:bg-slate-800 hover:text-slate-100 disabled:cursor-not-allowed disabled:opacity-35 sm:flex"
+        >
+          →
+        </button>
+
+        <div
+          className="w-full overflow-y-auto rounded-t-2xl border border-slate-700 bg-slate-900 shadow-2xl sm:mx-auto sm:max-w-2xl sm:rounded-2xl"
+          style={{ maxHeight: "92dvh" }}
+          onClick={(e) => e.stopPropagation()}
+        >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-700/60 px-6 py-4">
           <div className="flex items-center gap-3">
@@ -207,6 +254,7 @@ export default function StockModal({ stock, onClose }: Props) {
           <button
             onClick={onClose}
             className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-colors"
+            aria-label="Close modal"
           >
             ✕
           </button>
@@ -370,6 +418,7 @@ export default function StockModal({ stock, onClose }: Props) {
         <div className="border-t border-slate-700/60 px-6 py-3 text-xs text-slate-600">
           Last scanned {new Date(stock.last_updated).toLocaleString()} · ZigZag δ=5% · Buy zone ±2% of last trough
         </div>
+      </div>
       </div>
     </div>
   );
