@@ -90,7 +90,7 @@ export default async function HomePage() {
 
       {/* ── Footer ── */}
       <p className="mt-8 text-center text-xs text-slate-600">
-        Pi scans daily at 9 AM · Data stored in Supabase · Page cache updates within 60 s of new data
+        Updated daily by Raspberry Pi
       </p>
     </main>
   );
