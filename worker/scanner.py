@@ -30,7 +30,7 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 # ── Starter ticker list (replace with full NYSE fetch — see bottom) ───────────
-TICKERS: list[str] = [
+TICKERS = [
     "AAPL", "MSFT", "GOOGL", "AMZN", "META", "TSLA", "NVDA", "JPM", "BAC",
     "WFC", "GS", "MS", "C", "USB", "PNC", "TFC", "COF", "AXP", "V", "MA",
     "UNH", "JNJ", "PFE", "MRK", "ABBV", "LLY", "BMY", "AMGN", "GILD", "CVS",
