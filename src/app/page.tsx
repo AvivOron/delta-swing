@@ -1,5 +1,6 @@
 import { supabase, type StockRow } from "@/lib/supabase";
 import StocksTable from "@/components/StocksTable";
+import { LocalTime } from "@/components/LocalTime";
 
 // Revalidate every 60 seconds on Vercel so the page auto-refreshes data
 export const revalidate = 60;
@@ -56,14 +57,7 @@ export default async function HomePage() {
           <div className="flex items-center gap-1.5 text-sm">
             <span className="h-1.5 w-1.5 rounded-full bg-indigo-400" />
             <span className="text-slate-500">
-              {lastScanned
-                ? new Date(lastScanned).toLocaleString(undefined, {
-                    month: "short",
-                    day: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })
-                : "No data yet"}
+              {lastScanned ? <LocalTime iso={lastScanned} /> : "No data yet"}
             </span>
           </div>
         </div>
