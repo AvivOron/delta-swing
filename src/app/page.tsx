@@ -67,7 +67,7 @@ export default async function HomePage() {
       {/* ── Logic explanation ── */}
       <div className="mb-6 rounded-xl border border-slate-700/50 bg-slate-800/30 px-4 py-3 text-sm text-slate-400 leading-relaxed">
         Scans every NYSE and NASDAQ stock for a <span className="text-slate-200">ZigZag swing pattern</span> — a series of price moves of{" "}
-        <span className="text-slate-200">±10% or more</span> in alternating directions over the last{" "}
+        <span className="text-slate-200">±5% or more</span> in alternating directions over the last{" "}
         <span className="text-slate-200">180 days</span>. A stock appears here if it has at least{" "}
         <span className="text-slate-200">3 such swings</span>. A{" "}
         <span className="text-emerald-400 font-medium">Buy Signal</span> is raised when the current price is within{" "}

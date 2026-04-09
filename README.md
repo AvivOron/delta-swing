@@ -9,7 +9,7 @@ A free US stock scanner that detects ZigZag swing patterns across NYSE and NASDA
 ## What it does
 
 - Scans 5,000+ NYSE & NASDAQ stocks daily
-- Detects ZigZag patterns: alternating price moves of ±10% or more over the last 180 days
+- Detects ZigZag patterns: alternating price moves of ±5% or more over the last 180 days
 - A stock qualifies with at least 3 such swings
 - A **Buy Signal** is raised when the current price is within 2% above the most recent trough
 - AI analysis powered by Gemini
@@ -40,7 +40,7 @@ Raspberry Pi (cron @ 9AM Israel time)
 | Parameter | Value |
 |---|---|
 | Lookback window | 180 days |
-| ZigZag threshold | 10% |
+| ZigZag threshold | 5% |
 | Minimum swings | 3 |
 | Buy zone tolerance | within 2% of last trough |
 | Exchanges | NYSE + NASDAQ |

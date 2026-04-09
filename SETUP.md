@@ -1,6 +1,6 @@
 # Delta Swing — Setup Guide
 
-> **Scanner config:** 180-day lookback · 10% ZigZag threshold · min 3 swings · NYSE + NASDAQ
+> **Scanner config:** 180-day lookback · 5% ZigZag threshold · min 3 swings · NYSE + NASDAQ
 
 
 ## Part C: Infrastructure Setup

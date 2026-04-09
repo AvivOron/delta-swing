@@ -79,7 +79,7 @@ async function fetchHistory(ticker: string): Promise<ChartPoint[]> {
     .filter((p) => p.price !== null && p.timestamp >= cutoffTimestamp) as ChartPoint[];
 }
 
-const DELTA = 0.10;
+const DELTA = 0.05;
 const BUY_TOLERANCE = 0.02;
 const MAX_HISTORY_DAYS = 180;
 const MAX_HISTORY_SECONDS = MAX_HISTORY_DAYS * 24 * 60 * 60;
@@ -215,7 +215,7 @@ export default function StockModal({ stock, onClose, onPrevious, onNext, isFollo
 
   const bullets: string[] = [];
   if (pivots.length >= 2) {
-    bullets.push(`${pivots.length} swing pivot${pivots.length !== 1 ? "s" : ""} detected over the last 180 days using a 10% threshold.`);
+    bullets.push(`${pivots.length} swing pivot${pivots.length !== 1 ? "s" : ""} detected over the last 180 days using a 5% threshold.`);
   }
   if (lastHigh) bullets.push(`Most recent peak: $${lastHigh.price.toFixed(2)} on ${lastHigh.date}.`);
   if (lastLow) bullets.push(`Most recent trough: $${lastLow.price.toFixed(2)} on ${lastLow.date}.`);
@@ -478,7 +478,7 @@ export default function StockModal({ stock, onClose, onPrevious, onNext, isFollo
 
         {/* Footer */}
         <div className="border-t border-slate-700/60 px-6 py-3 text-xs text-slate-600">
-          Last scanned {new Date(stock.last_updated).toLocaleString()} · ZigZag δ=10% · Buy zone ±2% of last trough
+          Last scanned {new Date(stock.last_updated).toLocaleString()} · ZigZag δ=5% · Buy zone ±2% of last trough
         </div>
       </div>
       </div>
