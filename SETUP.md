@@ -1,5 +1,8 @@
 # Delta Swing — Setup Guide
 
+> **Scanner config:** 180-day lookback · 5% ZigZag threshold · min 3 swings · NYSE + NASDAQ
+
+
 ## Part C: Infrastructure Setup
 
 ---
@@ -109,22 +112,16 @@ npx vercel --prod
 
 ---
 
-### 4. Pro-Tip: Full NYSE Scan
+### 4. Ticker Sources
 
-Once you've confirmed your Supabase connection works with the 50-ticker starter list,
-replace the `TICKERS` list at the top of `scanner.py` with:
+The scanner automatically fetches both NYSE and NASDAQ tickers on startup from:
 
-```python
-import pandas as pd
-_df = pd.read_csv(
-    "https://raw.githubusercontent.com/rreichel3/US-Stock-Symbols/main/nyse/nyse_full_tickers.csv"
-)
-TICKERS = _df["Symbol"].dropna().str.strip().tolist()
-```
+- `https://raw.githubusercontent.com/rreichel3/US-Stock-Symbols/main/nyse/nyse_tickers.json`
+- `https://raw.githubusercontent.com/rreichel3/US-Stock-Symbols/main/nasdaq/nasdaq_tickers.json`
 
-This pulls ~3,000 NYSE symbols dynamically. The `ThreadPoolExecutor` with
-`MAX_WORKERS = 8` is already tuned for the Pi 4/5's quad-core with hyperthreading.
-You may bump it to 12–16 on a Pi 5 if you want faster throughput.
+This pulls ~5,000+ symbols dynamically (duplicates are deduplicated). If either fetch fails, the scanner falls back to a hardcoded 50-ticker starter list.
+
+The `ThreadPoolExecutor` with `MAX_WORKERS = 16` is tuned for the Pi 4/5's IO-bound workload. You may tune this value up or down depending on your Pi model.
 
 ---
 
@@ -141,5 +138,5 @@ Raspberry Pi (cron @ 9AM Israel time)
                              │
                     Next.js on Vercel
                        └─ page.tsx (ISR, revalidate=60s)
-                            └─ StocksTable → sortable, filterable UI
+                            └─ StocksTable → sortable, filterable, virtualized UI
 ```

@@ -15,6 +15,7 @@ async function getStocks(): Promise<StockRow[]> {
       .from("stocks")
       .select("ticker, price, swings_count, is_buy_zone, last_updated")
       .order("swings_count", { ascending: false })
+      .order("ticker", { ascending: true })
       .range(from, from + PAGE - 1);
 
     if (error) {
