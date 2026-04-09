@@ -270,10 +270,13 @@ export default function StockModal({ stock, onClose, onPrevious, onNext, isFollo
               href={`https://finance.yahoo.com/quote/${stock.ticker}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="font-mono text-2xl font-bold text-slate-100 hover:text-indigo-400 transition-colors"
+              className="group inline-flex items-center gap-1 font-mono text-2xl font-bold text-slate-100 hover:text-indigo-400 transition-colors"
               onClick={(e) => e.stopPropagation()}
             >
-              {stock.ticker} ↗
+              <span>{stock.ticker}</span>
+              <span className="text-base leading-none text-slate-400 transition-colors group-hover:text-indigo-400">
+                ↗
+              </span>
             </a>
             <span className="font-mono text-lg text-slate-400">${currentPrice.toFixed(2)}</span>
             <StatusBadge isBuyZone={stock.is_buy_zone} />

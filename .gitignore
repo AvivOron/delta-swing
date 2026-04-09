@@ -8,6 +8,7 @@ worker/.env
 # Next.js
 .next/
 node_modules/
+*.tsbuildinfo
 .env.local
 .env
 
