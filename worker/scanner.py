@@ -18,6 +18,9 @@ HEADERS = {
 }
 SESSION = requests.Session()
 SESSION.headers.update(HEADERS)
+# Keep pool size in sync with MAX_WORKERS to avoid "pool is full" warnings
+_adapter = requests.adapters.HTTPAdapter(pool_connections=20, pool_maxsize=20)
+SESSION.mount("https://", _adapter)
 
 
 def fetch_closes(ticker: str, days: int) -> pd.Series:
@@ -54,10 +57,12 @@ log = logging.getLogger(__name__)
 
 # ── Full NYSE ticker list ─────────────────────────────────────────────────────
 try:
-    _df = pd.read_csv(
-        "https://raw.githubusercontent.com/rreichel3/US-Stock-Symbols/main/nyse/nyse_full_tickers.csv"
+    _resp = SESSION.get(
+        "https://raw.githubusercontent.com/rreichel3/US-Stock-Symbols/main/nyse/nyse_tickers.json",
+        timeout=15,
     )
-    TICKERS = _df["Symbol"].dropna().str.strip().tolist()
+    _resp.raise_for_status()
+    TICKERS = [t.strip() for t in _resp.json() if isinstance(t, str) and t.strip()]
     log.info("Loaded %d NYSE tickers from remote CSV.", len(TICKERS))
 except Exception as _e:
     log.warning("Could not fetch NYSE CSV (%s), falling back to starter list.", _e)
