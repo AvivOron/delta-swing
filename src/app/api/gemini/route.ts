@@ -33,6 +33,8 @@ Format your response as:
 3. **About ${ticker}**: 2-3 sentences on what this company does, its sector, and any relevant context from your training data
 4. **Risk**: One key risk to watch for a new buyer
 
+5. **Signal Quality**: One sentence on whether the ZigZag signal is reliable here — flag if the stock is low-priced (under $5), highly volatile, or if the swing count seems unusually high for the price range.
+
 End with a one-line disclaimer that this is not financial advice.`;
 
   const res = await fetch(
