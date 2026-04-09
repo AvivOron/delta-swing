@@ -161,7 +161,15 @@ export default function StockModal({ stock, onClose }: Props) {
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-700/60 px-6 py-4">
           <div className="flex items-center gap-3">
-            <span className="font-mono text-2xl font-bold text-slate-100">{stock.ticker}</span>
+            <a
+              href={`https://finance.yahoo.com/quote/${stock.ticker}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-mono text-2xl font-bold text-slate-100 hover:text-indigo-400 transition-colors"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {stock.ticker} ↗
+            </a>
             <span className="font-mono text-lg text-slate-400">${currentPrice.toFixed(2)}</span>
             <StatusBadge isBuyZone={stock.is_buy_zone} />
           </div>
