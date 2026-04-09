@@ -61,20 +61,21 @@ export SUPABASE_KEY="your-service-role-key"   # use the service_role key, NOT th
 python scanner.py
 ```
 
-#### Crontab — daily at 9:00 AM
+#### Crontab — daily at 9:00 AM Israel time
 
 ```bash
 # Open crontab editor
 crontab -e
 ```
 
-Add this line (adjust the path as needed):
+Add these lines (adjust the path as needed):
 
 ```
+TZ=Asia/Jerusalem
 0 9 * * * /home/pi/delta-swing/worker/.venv/bin/python /home/pi/delta-swing/worker/scanner.py >> /home/pi/delta-swing/worker/scanner.log 2>&1
 ```
 
-This runs the scanner every day at **09:00**, and appends all output to `scanner.log`.
+The `TZ=Asia/Jerusalem` line sets the timezone for all jobs in the crontab, so the scanner runs at **09:00 Israel time** regardless of DST (Israel switches between UTC+2 and UTC+3).
 
 ---
 
@@ -130,7 +131,7 @@ You may bump it to 12–16 on a Pi 5 if you want faster throughput.
 ### 5. Architecture Overview
 
 ```
-Raspberry Pi (cron @ 9AM)
+Raspberry Pi (cron @ 9AM Israel time)
   └─ scanner.py
        ├─ yfinance → OHLC data (parallel, ThreadPoolExecutor)
        ├─ ZigZag algorithm → pivot detection
