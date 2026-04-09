@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import pandas as pd
 import yfinance as yf
-from supabase import create_client, Client
+from supabase import create_client
 
 # ── Configuration ────────────────────────────────────────────────────────────
 SUPABASE_URL: str = os.environ["SUPABASE_URL"]
@@ -46,7 +46,7 @@ TICKERS: list[str] = [
 
 
 # ── ZigZag calculation ────────────────────────────────────────────────────────
-def calculate_zigzag(closes: pd.Series, delta: float) -> list[dict]:
+def calculate_zigzag(closes: pd.Series, delta: float) -> list:
     """
     Return a list of pivot dicts: {"index": int, "price": float, "direction": str}
     direction is "high" (peak) or "low" (trough).
@@ -55,9 +55,9 @@ def calculate_zigzag(closes: pd.Series, delta: float) -> list[dict]:
         return []
 
     prices = closes.values
-    pivots: list[dict] = []
+    pivots = []
     last_pivot_price = prices[0]
-    last_direction: str | None = None  # "high" or "low"
+    last_direction = None  # "high" or "low"
 
     for i in range(1, len(prices)):
         p = prices[i]
@@ -87,7 +87,7 @@ def calculate_zigzag(closes: pd.Series, delta: float) -> list[dict]:
 
 
 # ── Per-ticker analysis ───────────────────────────────────────────────────────
-def analyze_ticker(ticker: str) -> dict | None:
+def analyze_ticker(ticker: str):
     """
     Fetch data, compute ZigZag, and return a result dict or None.
     """
@@ -136,7 +136,7 @@ def analyze_ticker(ticker: str) -> dict | None:
 
 
 # ── Supabase upsert ───────────────────────────────────────────────────────────
-def upsert_results(client: Client, rows: list[dict]) -> None:
+def upsert_results(client, rows: list) -> None:
     if not rows:
         log.info("No matching stocks to upsert.")
         return
@@ -154,9 +154,9 @@ def upsert_results(client: Client, rows: list[dict]) -> None:
 # ── Main ──────────────────────────────────────────────────────────────────────
 def main() -> None:
     log.info("Delta Swing Scanner starting — %d tickers", len(TICKERS))
-    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-    results: list[dict] = []
+    results = []
 
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as pool:
         futures = {pool.submit(analyze_ticker, t): t for t in TICKERS}
