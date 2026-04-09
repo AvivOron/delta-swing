@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import StatusBadge from "./StatusBadge";
 import StockModal from "./StockModal";
 import type { StockRow } from "@/lib/supabase";
@@ -12,12 +12,16 @@ interface StocksTableProps {
   stocks: StockRow[];
 }
 
+const PAGE_SIZE = 50;
+
 export default function StocksTable({ stocks }: StocksTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>("swings_count");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [filter, setFilter] = useState<"all" | "buy">("all");
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<StockRow | null>(null);
+  const [limit, setLimit] = useState(PAGE_SIZE);
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
   const handleSort = (key: SortKey) => {
     if (key === sortKey) {
@@ -30,13 +34,36 @@ export default function StocksTable({ stocks }: StocksTableProps) {
 
   const visible = stocks
     .filter((s) => filter === "all" || s.is_buy_zone)
-    .filter((s) => !search || s.ticker.toUpperCase().includes(search.toUpperCase()))
+    .filter((s) => !search || s.ticker.toUpperCase() === search.toUpperCase() || s.ticker.toUpperCase().startsWith(search.toUpperCase()))
     .sort((a, b) => {
       const av = a[sortKey];
       const bv = b[sortKey];
       const cmp = typeof av === "string" ? av.localeCompare(bv as string) : (av as number) - (bv as number);
       return sortDir === "asc" ? cmp : -cmp;
     });
+
+  const page = visible.slice(0, limit);
+  const hasMore = limit < visible.length;
+
+  // Reset limit when filters/sort change
+  useEffect(() => {
+    setLimit(PAGE_SIZE);
+  }, [filter, search, sortKey, sortDir]);
+
+  const loadMore = useCallback(() => {
+    setLimit((l) => l + PAGE_SIZE);
+  }, []);
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => { if (entries[0].isIntersecting) loadMore(); },
+      { rootMargin: "200px" }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [loadMore, hasMore]);
 
   const SortIcon = ({ col }: { col: SortKey }) => (
     <span className="ml-1 text-slate-500">
@@ -116,7 +143,7 @@ export default function StocksTable({ stocks }: StocksTableProps) {
                 </td>
               </tr>
             ) : (
-              visible.map((stock) => (
+              page.map((stock) => (
                 <tr
                   key={stock.ticker}
                   onClick={() => setSelected(stock)}
@@ -158,7 +185,7 @@ export default function StocksTable({ stocks }: StocksTableProps) {
         {visible.length === 0 ? (
           <p className="py-12 text-center text-slate-500">No stocks match the current filter.</p>
         ) : (
-          visible.map((stock) => (
+          page.map((stock) => (
             <button
               key={stock.ticker}
               onClick={() => setSelected(stock)}
@@ -187,6 +214,9 @@ export default function StocksTable({ stocks }: StocksTableProps) {
           ))
         )}
       </div>
+
+      {/* Scroll sentinel */}
+      {hasMore && <div ref={sentinelRef} className="h-1" />}
     </div>
   );
 }
