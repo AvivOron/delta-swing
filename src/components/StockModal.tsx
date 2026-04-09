@@ -186,10 +186,7 @@ export default function StockModal({ stock, onClose }: Props) {
                 <span className="flex items-center gap-1.5">
                   <span className="inline-block h-0.5 w-4 rounded bg-indigo-400 opacity-60" /> Price
                 </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="inline-block h-0.5 w-4 rounded bg-amber-400" /> ZigZag
-                </span>
-                <span className="flex items-center gap-1.5">
+<span className="flex items-center gap-1.5">
                   <span className="inline-block h-2 w-2 rounded-full bg-amber-400" /> Peak
                 </span>
                 <span className="flex items-center gap-1.5">
@@ -264,13 +261,11 @@ export default function StockModal({ stock, onClose }: Props) {
                     activeDot={{ r: 4, fill: "#6366f1" }}
                   />
 
-                  {/* ZigZag line connecting pivots with colored dots */}
+                  {/* Pivot dots — peaks (amber) and troughs (green) */}
                   <Line
                     type="linear"
                     dataKey="zigzag"
-                    stroke="#f59e0b"
-                    strokeWidth={1.5}
-                    strokeOpacity={0.8}
+                    stroke="none"
                     dot={<PivotDot />}
                     activeDot={false}
                     legendType="none"
