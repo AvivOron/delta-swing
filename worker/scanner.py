@@ -62,7 +62,10 @@ try:
         timeout=15,
     )
     _resp.raise_for_status()
-    TICKERS = [t.strip() for t in _resp.json() if isinstance(t, str) and t.strip()]
+    TICKERS = [
+        t.strip() for t in _resp.json()
+        if isinstance(t, str) and t.strip() and "^" not in t and "/" not in t
+    ]
     log.info("Loaded %d NYSE tickers from remote CSV.", len(TICKERS))
 except Exception as _e:
     log.warning("Could not fetch NYSE CSV (%s), falling back to starter list.", _e)
