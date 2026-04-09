@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
     )
     .join("\n");
 
-  const prompt = `You are a financial analyst assistant. A user does NOT currently hold ${ticker} and is deciding whether to buy it now as a new position.
+  const prompt = `You are a financial analyst assistant. A user does NOT currently hold ${ticker} and is deciding whether to buy it now as a new position. This is a NYSE/NASDAQ-listed US stock.
 
 Here is the ZigZag technical analysis data from the last 90 days:
 - Current price: $${price.toFixed(2)}
