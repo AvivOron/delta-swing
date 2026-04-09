@@ -135,15 +135,16 @@ export default function StockModal({ stock, onClose }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4"
       onClick={onClose}
     >
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
 
-      {/* Panel */}
+      {/* Panel — full-width sheet on mobile, centered card on desktop */}
       <div
-        className="relative z-10 w-full max-w-2xl rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl"
+        className="relative z-10 w-full overflow-y-auto rounded-t-2xl border border-slate-700 bg-slate-900 shadow-2xl sm:max-w-2xl sm:rounded-2xl"
+        style={{ maxHeight: "92dvh" }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

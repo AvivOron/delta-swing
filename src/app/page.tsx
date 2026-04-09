@@ -43,32 +43,29 @@ export default async function HomePage() {
   return (
     <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
       {/* ── Header ── */}
-      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-100 sm:text-3xl">
-            Delta Swing
-            <span className="ml-2 text-indigo-400">Pattern Finder</span>
-          </h1>
-          <p className="mt-1 text-sm text-slate-400">
-            NYSE stocks with ≥3 ZigZag swings ±10% in the last 30 days
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold tracking-tight text-slate-100 sm:text-3xl">
+          Delta Swing
+          <span className="ml-2 text-indigo-400">Pattern Finder</span>
+        </h1>
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+          <p className="text-sm text-slate-400">
+            NYSE ZigZag swing scanner
           </p>
-        </div>
-
-        {/* Last scanned pill */}
-        <div className="flex items-center gap-2 rounded-full border border-slate-700 bg-slate-800/60 px-4 py-2 text-sm">
-          <span className="h-2 w-2 rounded-full bg-indigo-400" />
-          <span className="text-slate-400">Last scanned:</span>
-          <span className="font-medium text-slate-200">
-            {lastScanned
-              ? new Date(lastScanned).toLocaleString(undefined, {
-                  weekday: "short",
-                  month: "short",
-                  day: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })
-              : "No data yet"}
-          </span>
+          <span className="text-slate-600">·</span>
+          <div className="flex items-center gap-1.5 text-sm">
+            <span className="h-1.5 w-1.5 rounded-full bg-indigo-400" />
+            <span className="text-slate-500">
+              {lastScanned
+                ? new Date(lastScanned).toLocaleString(undefined, {
+                    month: "short",
+                    day: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })
+                : "No data yet"}
+            </span>
+          </div>
         </div>
       </div>
 

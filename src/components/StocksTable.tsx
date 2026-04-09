@@ -48,43 +48,46 @@ export default function StocksTable({ stocks }: StocksTableProps) {
     "cursor-pointer select-none px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400 hover:text-slate-200 transition-colors";
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {selected && (
         <StockModal stock={selected} onClose={() => setSelected(null)} />
       )}
-      {/* Filter + Search */}
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          onClick={() => setFilter("all")}
-          className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-            filter === "all"
-              ? "bg-indigo-600 text-white"
-              : "bg-slate-800 text-slate-400 hover:text-slate-200"
-          }`}
-        >
-          All ({stocks.length})
-        </button>
-        <button
-          onClick={() => setFilter("buy")}
-          className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-            filter === "buy"
-              ? "bg-emerald-600 text-white"
-              : "bg-slate-800 text-slate-400 hover:text-slate-200"
-          }`}
-        >
-          Buy Signals ({stocks.filter((s) => s.is_buy_zone).length})
-        </button>
+
+      {/* Controls */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="flex gap-2">
+          <button
+            onClick={() => setFilter("all")}
+            className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+              filter === "all"
+                ? "bg-indigo-600 text-white"
+                : "bg-slate-800 text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            All ({stocks.length})
+          </button>
+          <button
+            onClick={() => setFilter("buy")}
+            className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+              filter === "buy"
+                ? "bg-emerald-600 text-white"
+                : "bg-slate-800 text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            Buy Signals ({stocks.filter((s) => s.is_buy_zone).length})
+          </button>
+        </div>
         <input
           type="text"
           placeholder="Search ticker…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="ml-auto rounded-full border border-slate-700 bg-slate-800 px-4 py-1.5 text-sm text-slate-200 placeholder-slate-500 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors w-40"
+          className="w-full rounded-full border border-slate-700 bg-slate-800 px-4 py-1.5 text-sm text-slate-200 placeholder-slate-500 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors sm:ml-auto sm:w-44"
         />
       </div>
 
-      {/* Table */}
-      <div className="overflow-x-auto rounded-xl border border-slate-700/60 bg-slate-900/60 backdrop-blur-sm">
+      {/* Desktop table */}
+      <div className="hidden overflow-x-auto rounded-xl border border-slate-700/60 bg-slate-900/60 backdrop-blur-sm md:block">
         <table className="w-full border-collapse text-sm">
           <thead className="border-b border-slate-700/60 bg-slate-800/40">
             <tr>
@@ -95,13 +98,13 @@ export default function StocksTable({ stocks }: StocksTableProps) {
                 Price <SortIcon col="price" />
               </th>
               <th className={thClass} onClick={() => handleSort("swings_count")}>
-                Swings Found <SortIcon col="swings_count" />
+                Swings <SortIcon col="swings_count" />
               </th>
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">
                 Status
               </th>
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">
-                Last Updated
+                Updated
               </th>
             </tr>
           </thead>
@@ -148,6 +151,41 @@ export default function StocksTable({ stocks }: StocksTableProps) {
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* Mobile card list */}
+      <div className="space-y-2 md:hidden">
+        {visible.length === 0 ? (
+          <p className="py-12 text-center text-slate-500">No stocks match the current filter.</p>
+        ) : (
+          visible.map((stock) => (
+            <button
+              key={stock.ticker}
+              onClick={() => setSelected(stock)}
+              className={`w-full rounded-xl border px-4 py-3 text-left transition-colors ${
+                stock.is_buy_zone
+                  ? "border-emerald-700/40 bg-emerald-950/20 hover:bg-emerald-950/30"
+                  : "border-slate-700/60 bg-slate-900/60 hover:bg-slate-800/60"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="font-mono text-base font-bold text-slate-100">
+                  {stock.ticker}
+                </span>
+                <StatusBadge isBuyZone={stock.is_buy_zone} />
+              </div>
+              <div className="mt-1.5 flex items-center gap-4 text-sm text-slate-400">
+                <span className="font-mono text-slate-300">${stock.price.toFixed(2)}</span>
+                <span>
+                  <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-indigo-600/20 text-xs font-bold text-indigo-300">
+                    {stock.swings_count}
+                  </span>
+                  <span className="ml-1">swings</span>
+                </span>
+              </div>
+            </button>
+          ))
+        )}
       </div>
     </div>
   );
