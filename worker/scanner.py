@@ -156,7 +156,7 @@ def upsert_results(client, rows: list) -> None:
 
     response = (
         client.table("stocks")
-        .upsert(rows, on_conflict="ticker")
+        .upsert(rows)
         .execute()
     )
     log.info("Upserted %d row(s) → Supabase.", len(rows))
