@@ -20,6 +20,7 @@ import type { StockRow } from "@/lib/supabase";
 interface ChartPoint {
   date: string;
   price: number;
+  timestamp: number;
   pivotHigh?: number;
   pivotLow?: number;
 }
@@ -68,16 +69,27 @@ async function fetchHistory(ticker: string): Promise<ChartPoint[]> {
   if (!result) return [];
   const timestamps: number[] = result.timestamp;
   const closes: number[] = result.indicators.quote[0].close;
+  const cutoffTimestamp = Math.floor(Date.now() / 1000) - MAX_HISTORY_SECONDS;
   return timestamps
     .map((ts, i) => ({
+      timestamp: ts,
       date: new Date(ts * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
       price: closes[i] ?? null,
     }))
-    .filter((p) => p.price !== null) as ChartPoint[];
+    .filter((p) => p.price !== null && p.timestamp >= cutoffTimestamp) as ChartPoint[];
 }
 
 const DELTA = 0.05;
 const BUY_TOLERANCE = 0.02;
+const MAX_HISTORY_DAYS = 180;
+const MAX_HISTORY_SECONDS = MAX_HISTORY_DAYS * 24 * 60 * 60;
+const TIMEFRAME_OPTIONS = [
+  { key: "1M", label: "1M", points: 21 },
+  { key: "3M", label: "3M", points: 63 },
+  { key: "6M", label: "6M", points: 126 },
+] as const;
+
+type TimeframeKey = (typeof TIMEFRAME_OPTIONS)[number]["key"];
 
 const PivotDot = (props: any) => {
   const { cx, cy, payload } = props;
@@ -103,6 +115,7 @@ export default function StockModal({ stock, onClose, onPrevious, onNext }: Props
   const [geminiLoading, setGeminiLoading] = useState(false);
   const [geminiText, setGeminiText] = useState<string | null>(null);
   const [geminiError, setGeminiError] = useState<string | null>(null);
+  const [timeframe, setTimeframe] = useState<TimeframeKey>("6M");
 
   useEffect(() => {
     setLoading(true);
@@ -110,6 +123,15 @@ export default function StockModal({ stock, onClose, onPrevious, onNext }: Props
       setHistory(data);
       setLoading(false);
     });
+  }, [stock.ticker]);
+
+  useEffect(() => {
+    setTimeframe("6M");
+    setGeminiText(null);
+    setGeminiError(null);
+  }, [stock.ticker]);
+
+  useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
       const isTypingTarget =
@@ -132,14 +154,17 @@ export default function StockModal({ stock, onClose, onPrevious, onNext }: Props
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [stock.ticker, onClose, onPrevious, onNext]);
+  }, [onClose, onPrevious, onNext]);
 
   const pivots = calculateZigzag(history, DELTA);
+  const timeframePoints = TIMEFRAME_OPTIONS.find((option) => option.key === timeframe)?.points ?? null;
+  const visibleHistory = timeframePoints ? history.slice(-timeframePoints) : history;
+  const visiblePivots = calculateZigzag(visibleHistory, DELTA);
 
   // Merge pivot markers into chart data, and add zigzag line values
-  const pivotDates = new Set(pivots.map((p) => p.date));
-  const chartData: ChartPoint[] = history.map((p) => {
-    const pivot = pivots.find((pv) => pv.date === p.date);
+  const pivotDates = new Set(visiblePivots.map((p) => p.date));
+  const chartData: ChartPoint[] = visibleHistory.map((p) => {
+    const pivot = visiblePivots.find((pv) => pv.date === p.date);
     return {
       ...p,
       zigzag: pivotDates.has(p.date) ? p.price : undefined,
@@ -156,8 +181,8 @@ export default function StockModal({ stock, onClose, onPrevious, onNext }: Props
     ? ((currentPrice - lastLow.price) / lastLow.price) * 100
     : null;
 
-  const priceMin = history.length ? Math.min(...history.map((p) => p.price)) * 0.96 : 0;
-  const priceMax = history.length ? Math.max(...history.map((p) => p.price)) * 1.04 : 0;
+  const priceMin = visibleHistory.length ? Math.min(...visibleHistory.map((p) => p.price)) * 0.96 : 0;
+  const priceMax = visibleHistory.length ? Math.max(...visibleHistory.map((p) => p.price)) * 1.04 : 0;
 
   async function askGemini() {
     setGeminiLoading(true);
@@ -268,6 +293,28 @@ export default function StockModal({ stock, onClose, onPrevious, onNext }: Props
             </div>
           ) : (
             <>
+              <div className="mb-3 flex items-center justify-between gap-3 px-2">
+                <div className="text-xs uppercase tracking-wider text-slate-500">
+                  Chart Range
+                </div>
+                <div className="flex items-center gap-1 rounded-full border border-slate-700/60 bg-slate-800/60 p-1">
+                  {TIMEFRAME_OPTIONS.map((option) => (
+                    <button
+                      key={option.key}
+                      type="button"
+                      onClick={() => setTimeframe(option.key)}
+                      className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                        timeframe === option.key
+                          ? "bg-indigo-600 text-white"
+                          : "text-slate-400 hover:bg-slate-700/70 hover:text-slate-200"
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* Legend */}
               <div className="mb-2 flex flex-wrap gap-x-4 gap-y-1 px-2 text-xs text-slate-500">
                 <span className="flex items-center gap-1.5">
