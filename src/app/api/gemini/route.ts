@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
 
 Here is the ZigZag technical analysis data from the last 180 days:
 - Current price: $${price.toFixed(2)}
-- ZigZag swings detected (5% threshold): ${swingsCount}
+- ZigZag swings detected (10% threshold): ${swingsCount}
 - Buy zone signal (within 2% above last trough): ${isBuyZone ? "YES" : "NO"}
 ${distanceFromLow !== null ? `- Distance from last trough: ${distanceFromLow.toFixed(1)}%` : ""}
 - Swing pivots (last 180 days):
