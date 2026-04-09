@@ -20,16 +20,18 @@ export default function OgImage() {
           position: "relative",
         }}
       >
-        {/* Grid background */}
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            backgroundImage:
-              "linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px)",
-            backgroundSize: "60px 60px",
-          }}
-        />
+        {/* Grid background — use SVG pattern instead of rgba() in backgroundImage */}
+        <svg
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <defs>
+            <pattern id="grid" width="60" height="60" patternUnits="userSpaceOnUse">
+              <path d="M 60 0 L 0 0 0 60" fill="none" stroke="white" strokeWidth="0.5" strokeOpacity="0.06" />
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#grid)" />
+        </svg>
 
         {/* Indigo glow */}
         <div
