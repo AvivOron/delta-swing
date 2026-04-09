@@ -79,7 +79,7 @@ export default function OgImage() {
           </div>
 
           {/* Pills */}
-          <div style={{ display: "flex", gap: 12, marginTop: 24 }}>
+          <div style={{ display: "flex", gap: 12, marginTop: 20 }}>
             {["2,300+ tickers", "Daily scan", "Buy signals"].map((label) => (
               <div
                 key={label}
@@ -97,6 +97,24 @@ export default function OgImage() {
                 {label}
               </div>
             ))}
+          </div>
+
+          {/* CTA */}
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 36 }}>
+            <div style={{
+              display: "flex",
+              padding: "12px 28px",
+              borderRadius: 999,
+              background: "#6366f1",
+              fontSize: 20,
+              fontWeight: 700,
+              color: "#ffffff",
+            }}>
+              View today's signals →
+            </div>
+            <div style={{ display: "flex", fontSize: 18, color: "rgba(255,255,255,0.25)" }}>
+              avivo.dev/delta-swing
+            </div>
           </div>
         </div>
       </div>
