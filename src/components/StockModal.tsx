@@ -61,7 +61,7 @@ function calculateZigzag(data: ChartPoint[], delta: number): Pivot[] {
 }
 
 async function fetchHistory(ticker: string): Promise<ChartPoint[]> {
-  const res = await fetch(`/api/chart?ticker=${encodeURIComponent(ticker)}`);
+  const res = await fetch(`/delta-swing/api/chart?ticker=${encodeURIComponent(ticker)}`);
   const json = await res.json();
   const result = json?.chart?.result?.[0];
   if (!result) return [];
