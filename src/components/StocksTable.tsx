@@ -16,6 +16,7 @@ export default function StocksTable({ stocks }: StocksTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>("swings_count");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [filter, setFilter] = useState<"all" | "buy">("all");
+  const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<StockRow | null>(null);
 
   const handleSort = (key: SortKey) => {
@@ -29,6 +30,7 @@ export default function StocksTable({ stocks }: StocksTableProps) {
 
   const visible = stocks
     .filter((s) => filter === "all" || s.is_buy_zone)
+    .filter((s) => !search || s.ticker.toUpperCase().includes(search.toUpperCase()))
     .sort((a, b) => {
       const av = a[sortKey];
       const bv = b[sortKey];
@@ -50,8 +52,8 @@ export default function StocksTable({ stocks }: StocksTableProps) {
       {selected && (
         <StockModal stock={selected} onClose={() => setSelected(null)} />
       )}
-      {/* Filter toggle */}
-      <div className="flex items-center gap-2">
+      {/* Filter + Search */}
+      <div className="flex flex-wrap items-center gap-2">
         <button
           onClick={() => setFilter("all")}
           className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
@@ -72,6 +74,13 @@ export default function StocksTable({ stocks }: StocksTableProps) {
         >
           Buy Signals ({stocks.filter((s) => s.is_buy_zone).length})
         </button>
+        <input
+          type="text"
+          placeholder="Search ticker…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="ml-auto rounded-full border border-slate-700 bg-slate-800 px-4 py-1.5 text-sm text-slate-200 placeholder-slate-500 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors w-40"
+        />
       </div>
 
       {/* Table */}
