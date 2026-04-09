@@ -19,11 +19,14 @@ export default function StocksTable({ stocks }: StocksTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>("swings_count");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [filter, setFilter] = useState<"all" | "buy" | "followed">("all");
+  const [minPrice, setMinPrice] = useState("");
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<StockRow | null>(null);
   const [limit, setLimit] = useState(PAGE_SIZE);
   const [followedTickers, setFollowedTickers] = useState<Set<string>>(new Set());
   const sentinelRef = useRef<HTMLDivElement>(null);
+  const minPriceValue = Number(minPrice);
+  const hasMinPriceFilter = minPrice.trim() !== "" && Number.isFinite(minPriceValue) && minPriceValue > 0;
 
   useEffect(() => {
     try {
@@ -60,6 +63,7 @@ export default function StocksTable({ stocks }: StocksTableProps) {
       if (filter === "followed") return followedTickers.has(s.ticker);
       return true;
     })
+    .filter((s) => !hasMinPriceFilter || s.price >= minPriceValue)
     .filter((s) => !search || s.ticker.toUpperCase() === search.toUpperCase() || s.ticker.toUpperCase().startsWith(search.toUpperCase()))
     .sort((a, b) => {
       const av = a[sortKey];
@@ -67,6 +71,9 @@ export default function StocksTable({ stocks }: StocksTableProps) {
       const cmp = typeof av === "string" ? av.localeCompare(bv as string) : (av as number) - (bv as number);
       return sortDir === "asc" ? cmp : -cmp;
     });
+  const buySignalsTotal = stocks.filter((s) => s.is_buy_zone).length;
+  const baseCount = filter === "buy" ? buySignalsTotal : stocks.length;
+  const countLabel = filter === "buy" ? "Buy Signal stocks" : "stocks";
 
   const page = visible.slice(0, limit);
   const hasMore = limit < visible.length;
@@ -79,7 +86,7 @@ export default function StocksTable({ stocks }: StocksTableProps) {
   // Reset limit when filters/sort change
   useEffect(() => {
     setLimit(PAGE_SIZE);
-  }, [filter, search, sortKey, sortDir]);
+  }, [filter, hasMinPriceFilter, minPriceValue, search, sortKey, sortDir]);
 
   useEffect(() => {
     if (!selected) return;
@@ -161,7 +168,7 @@ export default function StocksTable({ stocks }: StocksTableProps) {
 
       {/* Controls */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setFilter("all")}
             className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
@@ -193,18 +200,40 @@ export default function StocksTable({ stocks }: StocksTableProps) {
             Following ({followedTickers.size})
           </button>
         </div>
-        <input
-          type="text"
-          placeholder="Search ticker…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full rounded-full border border-slate-700 bg-slate-800 px-4 py-1.5 text-sm text-slate-200 placeholder-slate-500 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors sm:ml-auto sm:w-44"
-        />
+        <div className="flex gap-2 sm:ml-auto">
+          <label className="flex items-center gap-2 rounded-full border border-slate-700 bg-slate-800 px-4 py-1.5 text-sm text-slate-400 focus-within:border-indigo-500 focus-within:ring-1 focus-within:ring-indigo-500 transition-colors">
+            <span>Min $</span>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              inputMode="decimal"
+              placeholder="0"
+              value={minPrice}
+              onChange={(e) => setMinPrice(e.target.value)}
+              className="w-20 bg-transparent text-slate-200 outline-none placeholder-slate-500"
+            />
+          </label>
+          <input
+            type="text"
+            placeholder="Search ticker…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full rounded-full border border-slate-700 bg-slate-800 px-4 py-1.5 text-sm text-slate-200 placeholder-slate-500 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors sm:w-44"
+          />
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between px-1 text-sm text-slate-500">
+        <span>
+          Showing <span className="text-slate-300">{visible.length}</span> of{" "}
+          <span className="text-slate-300">{baseCount}</span> {countLabel}
+        </span>
       </div>
 
       {/* Desktop table */}
       <div className="hidden overflow-x-auto rounded-xl border border-slate-700/60 bg-slate-900/60 backdrop-blur-sm md:block">
-        <table className="w-full border-collapse text-sm">
+        <table className="w-full border-separate border-spacing-0 text-sm">
           <thead className="border-b border-slate-700/60 bg-slate-800/40">
             <tr>
               <th className={`${thClass} w-[13rem]`} onClick={() => handleSort("ticker")}>
@@ -229,7 +258,7 @@ export default function StocksTable({ stocks }: StocksTableProps) {
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-800/60">
+          <tbody className="[&>tr+tr>td]:border-t [&>tr+tr>td]:border-slate-800/60">
             {visible.length === 0 ? (
               <tr>
                 <td colSpan={5} className="px-4 py-12 text-center text-slate-500">
