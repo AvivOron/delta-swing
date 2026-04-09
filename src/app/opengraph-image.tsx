@@ -20,19 +20,6 @@ export default function OgImage() {
           position: "relative",
         }}
       >
-        {/* Grid background — use SVG pattern instead of rgba() in backgroundImage */}
-        <svg
-          style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <defs>
-            <pattern id="grid" width="60" height="60" patternUnits="userSpaceOnUse">
-              <path d="M 60 0 L 0 0 0 60" fill="none" stroke="white" strokeWidth="0.5" strokeOpacity="0.06" />
-            </pattern>
-          </defs>
-          <rect width="100%" height="100%" fill="url(#grid)" />
-        </svg>
-
         {/* Indigo glow */}
         <div
           style={{
@@ -45,12 +32,13 @@ export default function OgImage() {
             top: "50%",
             left: "30%",
             transform: "translate(-50%, -50%)",
+            display: "flex",
           }}
         />
 
-        {/* Fake ZigZag chart lines */}
+        {/* Fake ZigZag chart */}
         <svg
-          style={{ position: "absolute", right: 60, bottom: 60, opacity: 0.12 }}
+          style={{ position: "absolute", right: 60, bottom: 60, opacity: 0.15 }}
           width="420"
           height="220"
           viewBox="0 0 420 220"
@@ -61,75 +49,32 @@ export default function OgImage() {
             stroke="#6366f1"
             strokeWidth="3"
           />
-          {/* Pivot dots */}
-          {[
-            [60, 140], [120, 170], [180, 80], [240, 120], [300, 50], [360, 90],
-          ].map(([x, y], i) => (
-            <circle
-              key={i}
-              cx={x}
-              cy={y}
-              r="6"
-              fill={i % 2 === 0 ? "#10b981" : "#f59e0b"}
-            />
-          ))}
+          <circle cx="60"  cy="140" r="6" fill="#10b981" />
+          <circle cx="120" cy="170" r="6" fill="#f59e0b" />
+          <circle cx="180" cy="80"  r="6" fill="#10b981" />
+          <circle cx="240" cy="120" r="6" fill="#f59e0b" />
+          <circle cx="300" cy="50"  r="6" fill="#10b981" />
+          <circle cx="360" cy="90"  r="6" fill="#f59e0b" />
         </svg>
 
-        {/* Content */}
+        {/* Main content */}
         <div style={{ display: "flex", flexDirection: "column", gap: 16, position: "relative" }}>
           {/* Badge */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              marginBottom: 8,
-            }}
-          >
-            <div
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: "50%",
-                background: "#6366f1",
-              }}
-            />
-            <span
-              style={{
-                fontSize: 18,
-                color: "rgba(255,255,255,0.35)",
-                fontFamily: "monospace",
-                letterSpacing: "0.1em",
-                textTransform: "uppercase",
-              }}
-            >
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+            <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#6366f1", display: "flex" }} />
+            <span style={{ fontSize: 18, color: "rgba(255,255,255,0.35)", fontFamily: "monospace", letterSpacing: "0.1em" }}>
               avivo.dev
             </span>
           </div>
 
           {/* Title */}
-          <div
-            style={{
-              fontSize: 82,
-              fontWeight: 800,
-              color: "#ffffff",
-              letterSpacing: "-3px",
-              lineHeight: 1,
-            }}
-          >
-            Delta{" "}
+          <div style={{ display: "flex", fontSize: 82, fontWeight: 800, color: "#ffffff", letterSpacing: "-3px", lineHeight: 1 }}>
+            <span>Delta&nbsp;</span>
             <span style={{ color: "#6366f1" }}>Swing</span>
           </div>
 
           {/* Subtitle */}
-          <div
-            style={{
-              fontSize: 28,
-              color: "rgba(255,255,255,0.45)",
-              letterSpacing: "-0.3px",
-              marginTop: 8,
-            }}
-          >
+          <div style={{ display: "flex", fontSize: 28, color: "rgba(255,255,255,0.45)", marginTop: 8 }}>
             NYSE ZigZag pattern scanner · Powered by Raspberry Pi
           </div>
 
@@ -139,6 +84,7 @@ export default function OgImage() {
               <div
                 key={label}
                 style={{
+                  display: "flex",
                   padding: "8px 20px",
                   borderRadius: 999,
                   border: "1px solid rgba(99,102,241,0.3)",
