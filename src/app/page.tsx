@@ -5,16 +5,28 @@ import StocksTable from "@/components/StocksTable";
 export const revalidate = 60;
 
 async function getStocks(): Promise<StockRow[]> {
-  const { data, error } = await supabase
-    .from("stocks")
-    .select("ticker, price, swings_count, is_buy_zone, last_updated")
-    .order("swings_count", { ascending: false });
+  const PAGE = 1000;
+  const all: StockRow[] = [];
+  let from = 0;
 
-  if (error) {
-    console.error("Supabase fetch error:", error.message);
-    return [];
+  while (true) {
+    const { data, error } = await supabase
+      .from("stocks")
+      .select("ticker, price, swings_count, is_buy_zone, last_updated")
+      .order("swings_count", { ascending: false })
+      .range(from, from + PAGE - 1);
+
+    if (error) {
+      console.error("Supabase fetch error:", error.message);
+      break;
+    }
+    if (!data || data.length === 0) break;
+    all.push(...(data as StockRow[]));
+    if (data.length < PAGE) break;
+    from += PAGE;
   }
-  return (data as StockRow[]) ?? [];
+
+  return all;
 }
 
 export default async function HomePage() {
