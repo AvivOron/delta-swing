@@ -201,7 +201,7 @@ export default function StocksTable({ stocks }: StocksTableProps) {
           </button>
         </div>
         <div className="flex gap-2 sm:ml-auto">
-          <label className="flex items-center gap-2 rounded-full border border-slate-700 bg-slate-800 px-4 py-1.5 text-sm text-slate-400 focus-within:border-indigo-500 focus-within:ring-1 focus-within:ring-indigo-500 transition-colors">
+          <label className="flex w-28 shrink-0 items-center gap-2 rounded-full border border-slate-700 bg-slate-800 px-3 py-1.5 text-sm text-slate-400 transition-colors focus-within:border-indigo-500 focus-within:ring-1 focus-within:ring-indigo-500 sm:w-auto sm:px-4">
             <span>Min $</span>
             <input
               type="number"
@@ -211,7 +211,7 @@ export default function StocksTable({ stocks }: StocksTableProps) {
               placeholder="0"
               value={minPrice}
               onChange={(e) => setMinPrice(e.target.value)}
-              className="w-20 bg-transparent text-slate-200 outline-none placeholder-slate-500"
+              className="min-w-0 flex-1 bg-transparent text-right text-slate-200 outline-none placeholder-slate-500 sm:w-20 sm:flex-none"
             />
           </label>
           <input
@@ -219,7 +219,7 @@ export default function StocksTable({ stocks }: StocksTableProps) {
             placeholder="Search ticker…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-full border border-slate-700 bg-slate-800 px-4 py-1.5 text-sm text-slate-200 placeholder-slate-500 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors sm:w-44"
+            className="min-w-0 flex-1 rounded-full border border-slate-700 bg-slate-800 px-4 py-1.5 text-sm text-slate-200 placeholder-slate-500 outline-none transition-colors focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 sm:w-44 sm:flex-none"
           />
         </div>
       </div>
