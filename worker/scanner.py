@@ -133,13 +133,13 @@ def analyze_ticker(ticker: str):
         is_buy_zone = False
         if last_low:
             distance = (current_price - last_low["price"]) / last_low["price"]
-            is_buy_zone = 0 <= distance <= BUY_ZONE_TOLERANCE
+            is_buy_zone = bool(0 <= distance <= BUY_ZONE_TOLERANCE)
 
         return {
             "ticker": ticker,
-            "price": round(current_price, 4),
-            "swings_count": len(pivots),
-            "is_buy_zone": is_buy_zone,
+            "price": round(float(current_price), 4),
+            "swings_count": int(len(pivots)),
+            "is_buy_zone": bool(is_buy_zone),
             "last_updated": datetime.now(timezone.utc).isoformat(),
         }
 
