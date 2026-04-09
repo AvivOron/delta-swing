@@ -51,7 +51,7 @@ export default async function HomePage() {
         </h1>
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
           <p className="text-sm text-slate-400">
-            NYSE ZigZag swing scanner
+            US stock ZigZag swing scanner
           </p>
           <span className="text-slate-600">·</span>
           <div className="flex items-center gap-1.5 text-sm">

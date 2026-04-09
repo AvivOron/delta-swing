@@ -3,9 +3,9 @@ import "./globals.css";
 
 const BASE_URL = "https://avivo.dev/delta-swing";
 const OG_IMAGE = "https://avivo.dev/delta-swing/opengraph-image";
-const TITLE = "Delta Swing — Free NYSE Stock Pattern Finder & Scanner";
+const TITLE = "Delta Swing — Free US Stock Pattern Finder & Scanner";
 const DESCRIPTION =
-  "Scans 2,300+ NYSE stocks daily for ZigZag swing patterns. Surfaces buy signals when a stock bounces off recent support. Free, updated every morning by a Raspberry Pi.";
+  "Scans 5,000+ NYSE & NASDAQ stocks daily for ZigZag swing patterns. Surfaces buy signals when a stock bounces off recent support. Free, updated every morning by a Raspberry Pi.";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://avivo.dev"),
@@ -14,6 +14,7 @@ export const metadata: Metadata = {
   keywords: [
     "stock scanner",
     "NYSE",
+    "NASDAQ",
     "ZigZag pattern",
     "swing trading",
     "buy signal",
@@ -29,7 +30,7 @@ export const metadata: Metadata = {
     title: TITLE,
     description: DESCRIPTION,
     siteName: "Delta Swing",
-    images: [{ url: OG_IMAGE, width: 1200, height: 630, alt: "Delta Swing — NYSE ZigZag Stock Pattern Finder" }],
+    images: [{ url: OG_IMAGE, width: 1200, height: 630, alt: "Delta Swing — US Stock ZigZag Pattern Finder" }],
   },
   twitter: {
     card: "summary_large_image",

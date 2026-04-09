@@ -75,7 +75,7 @@ export default function OgImage() {
 
           {/* Subtitle */}
           <div style={{ display: "flex", fontSize: 28, color: "rgba(255,255,255,0.45)", marginTop: 8 }}>
-            NYSE ZigZag pattern scanner · Powered by Raspberry Pi
+            US stock ZigZag pattern scanner · Powered by Raspberry Pi
           </div>
 
           {/* Pills */}
