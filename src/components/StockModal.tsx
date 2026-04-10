@@ -118,6 +118,10 @@ export default function StockModal({ stock, onClose, onPrevious, onNext, isFollo
   const [geminiText, setGeminiText] = useState<string | null>(null);
   const [geminiError, setGeminiError] = useState<string | null>(null);
   const [timeframe, setTimeframe] = useState<TimeframeKey>("6M");
+  const [buyPrice, setBuyPrice] = useState("");
+  const [sellLoading, setSellLoading] = useState(false);
+  const [sellText, setSellText] = useState<string | null>(null);
+  const [sellError, setSellError] = useState<string | null>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -131,6 +135,9 @@ export default function StockModal({ stock, onClose, onPrevious, onNext, isFollo
     setTimeframe("6M");
     setGeminiText(null);
     setGeminiError(null);
+    setSellText(null);
+    setSellError(null);
+    setBuyPrice("");
   }, [stock.ticker]);
 
   useEffect(() => {
@@ -185,6 +192,47 @@ export default function StockModal({ stock, onClose, onPrevious, onNext, isFollo
 
   const priceMin = visibleHistory.length ? Math.min(...visibleHistory.map((p) => p.price)) * 0.96 : 0;
   const priceMax = visibleHistory.length ? Math.max(...visibleHistory.map((p) => p.price)) * 1.04 : 0;
+
+  async function askSell() {
+    const parsed = parseFloat(buyPrice);
+    if (!buyPrice || isNaN(parsed) || parsed <= 0) return;
+    setSellLoading(true);
+    setSellText(null);
+    setSellError(null);
+    try {
+      // Fetch live price before calling Gemini
+      const quoteRes = await fetch(`/delta-swing/api/chart?ticker=${encodeURIComponent(stock.ticker)}`);
+      const quoteJson = await quoteRes.json();
+      const result = quoteJson?.chart?.result?.[0];
+      const closes: number[] = result?.indicators?.quote?.[0]?.close ?? [];
+      const livePrice = closes.filter(Boolean).at(-1) ?? currentPrice;
+
+      const liveDistanceFromLow = lastLow
+        ? ((livePrice - lastLow.price) / lastLow.price) * 100
+        : distanceFromLow;
+
+      const res = await fetch("/delta-swing/api/gemini-sell", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ticker: stock.ticker,
+          buyPrice: parsed,
+          currentPrice: livePrice,
+          pivots,
+          distanceFromLow: liveDistanceFromLow,
+          lastHigh,
+          lastLow,
+        }),
+      });
+      const data = await res.json();
+      if (data.error) setSellError(data.error);
+      else setSellText(data.analysis);
+    } catch {
+      setSellError("Failed to reach Gemini.");
+    } finally {
+      setSellLoading(false);
+    }
+  }
 
   async function askGemini() {
     setGeminiLoading(true);
@@ -436,23 +484,26 @@ export default function StockModal({ stock, onClose, onPrevious, onNext, isFollo
             <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
               Signal Analysis
             </h3>
-            <button
-              onClick={askGemini}
-              disabled={geminiLoading || loading}
-              className="flex items-center gap-1.5 rounded-lg border border-indigo-500/40 bg-indigo-600/10 px-3 py-1 text-xs font-medium text-indigo-300 hover:bg-indigo-600/20 hover:text-indigo-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            >
-              {geminiLoading ? (
-                <>
-                  <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-                  </svg>
-                  Asking…
-                </>
-              ) : (
-                <>✦ Ask Gemini</>
-              )}
-            </button>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Should I Buy?</span>
+              <button
+                onClick={askGemini}
+                disabled={geminiLoading || loading}
+                className="flex items-center gap-1.5 rounded-lg border border-indigo-500/40 bg-indigo-600/10 px-3 py-1.5 text-xs font-medium text-indigo-300 hover:bg-indigo-600/20 hover:text-indigo-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                {geminiLoading ? (
+                  <>
+                    <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                    </svg>
+                    Asking…
+                  </>
+                ) : (
+                  <>✦ Ask Gemini</>
+                )}
+              </button>
+            </div>
           </div>
           <ul className="space-y-1.5">
             {bullets.map((b, i) => (
@@ -475,6 +526,48 @@ export default function StockModal({ stock, onClose, onPrevious, onNext, isFollo
           {geminiText && (
             <div className="mt-3 rounded-xl border border-indigo-500/20 bg-indigo-950/30 px-4 py-3 text-sm text-slate-300 leading-relaxed prose prose-invert prose-sm max-w-none">
               <ReactMarkdown>{geminiText}</ReactMarkdown>
+            </div>
+          )}
+        </div>
+
+        {/* Should I Sell? */}
+        <div className="border-t border-slate-700/60 px-6 py-4">
+          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
+            Should I Sell?
+          </h3>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-slate-300">I bought at</span>
+            <input
+              type="number"
+              min="0"
+              step="any"
+              placeholder="$0.00"
+              value={buyPrice}
+              onChange={(e) => setBuyPrice(e.target.value)}
+              className="w-28 rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-sm text-slate-100 placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
+            />
+            <button
+              onClick={askSell}
+              disabled={sellLoading || loading || !buyPrice || isNaN(parseFloat(buyPrice)) || parseFloat(buyPrice) <= 0}
+              className="flex items-center gap-1.5 rounded-lg border border-indigo-500/40 bg-indigo-600/10 px-3 py-1.5 text-xs font-medium text-indigo-300 hover:bg-indigo-600/20 hover:text-indigo-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              {sellLoading ? (
+                <>
+                  <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                  </svg>
+                  Asking…
+                </>
+              ) : (
+                <>✦ Ask Gemini</>
+              )}
+            </button>
+          </div>
+          {sellError && <p className="mt-3 text-sm text-red-400">{sellError}</p>}
+          {sellText && (
+            <div className="mt-3 rounded-xl border border-indigo-500/20 bg-indigo-950/30 px-4 py-3 text-sm text-slate-300 leading-relaxed prose prose-invert prose-sm max-w-none">
+              <ReactMarkdown>{sellText}</ReactMarkdown>
             </div>
           )}
         </div>
