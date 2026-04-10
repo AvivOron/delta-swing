@@ -75,8 +75,12 @@ Add these lines (adjust the path as needed):
 
 ```
 TZ=Asia/Jerusalem
+SUPABASE_URL=https://xxxxxxxxxxxx.supabase.co
+SUPABASE_KEY=your-service-role-key
 0 9 * * * /home/pi/delta-swing/worker/.venv/bin/python /home/pi/delta-swing/worker/scanner.py >> /home/pi/delta-swing/worker/scanner.log 2>&1
 ```
+
+> **Note:** Cron does not inherit your shell environment, so env vars must be set directly in the crontab file as shown above.
 
 The `TZ=Asia/Jerusalem` line sets the timezone for all jobs in the crontab, so the scanner runs at **09:00 Israel time** regardless of DST (Israel switches between UTC+2 and UTC+3).
 
