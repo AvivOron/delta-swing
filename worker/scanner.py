@@ -49,6 +49,7 @@ BUY_ZONE_TOLERANCE: float = 0.02  # within 2% of last pivot low
 MAX_WORKERS: int = 16        # tune for Pi 4/5 — IO-bound so can exceed core count
 GABO_FLOOR_VARIANCE: float = 0.03  # ±3% max spread between the 3 floor prices
 GABO_MIN_BOUNCE: float = 0.08      # each floor must bounce ≥8% to next peak
+MIN_MARKET_CAP: int = 1_000_000_000  # $1B minimum market cap
 
 logging.basicConfig(
     level=logging.INFO,
@@ -174,6 +175,22 @@ def analyze_ticker(ticker: str):
     Fetch data, compute ZigZag, and return a result dict or None.
     """
     try:
+        info_res = SESSION.get(
+            f"https://query1.finance.yahoo.com/v10/finance/quoteSummary/{ticker}?modules=summaryDetail",
+            timeout=15,
+        )
+        if info_res.status_code == 200:
+            market_cap = (
+                info_res.json()
+                .get("quoteSummary", {})
+                .get("result", [{}])[0]
+                .get("summaryDetail", {})
+                .get("marketCap", {})
+                .get("raw", 0)
+            )
+            if market_cap and market_cap < MIN_MARKET_CAP:
+                return None
+
         closes = fetch_closes(ticker, LOOKBACK_DAYS)
         if len(closes) < 5:
             return None

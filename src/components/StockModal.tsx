@@ -102,6 +102,47 @@ const TIMEFRAME_OPTIONS = [
 type TimeframeKey = (typeof TIMEFRAME_OPTIONS)[number]["key"];
 type ModalTab = "analysis" | "gabo";
 
+interface GaboFloor {
+  price: number;
+  date: string;
+  bounce: number;
+}
+
+interface GaboDetails {
+  floors: GaboFloor[];
+  variance: number;
+  avgFloor: number;
+  avgBounce: number;
+}
+
+function computeGaboDetails(pivots: Pivot[]): GaboDetails | null {
+  const lows = pivots.filter((p) => p.direction === "low");
+  if (lows.length < 3) return null;
+
+  const recentLows = lows.slice(-3);
+  const floors: GaboFloor[] = [];
+
+  for (const low of recentLows) {
+    const lowIdx = pivots.findIndex((p) => p.timestamp === low.timestamp);
+    const nextHigh = pivots.slice(lowIdx + 1).find((p) => p.direction === "high");
+    if (!nextHigh) return null;
+    floors.push({
+      price: low.price,
+      date: low.date,
+      bounce: (nextHigh.price - low.price) / low.price,
+    });
+  }
+
+  const prices = floors.map((f) => f.price);
+  const avgFloor = prices.reduce((a, b) => a + b, 0) / prices.length;
+  return {
+    floors,
+    variance: (Math.max(...prices) - Math.min(...prices)) / avgFloor,
+    avgFloor,
+    avgBounce: floors.reduce((a, f) => a + f.bounce, 0) / floors.length,
+  };
+}
+
 const PivotDot = (props: any) => {
   const { cx, cy, payload } = props;
   if (payload.pivotHigh !== undefined) {
@@ -275,6 +316,8 @@ export default function StockModal({ stock, onClose, onPrevious, onNext, isFollo
     }
   }
 
+
+  const gaboDetails = loading ? null : computeGaboDetails(pivots);
 
   const bullets: string[] = [];
   if (pivots.length >= 2) {
@@ -622,7 +665,7 @@ export default function StockModal({ stock, onClose, onPrevious, onNext, isFollo
                   Triple Floor Volatility Algorithm
                 </h3>
                 <p className="mt-1 text-xs text-slate-500">
-                  3 most recent troughs within ±2% of each other, each followed by a ≥10% bounce.
+                  3 most recent troughs within ±3% of each other, each followed by a ≥8% bounce.
                 </p>
               </div>
               <span
@@ -636,13 +679,70 @@ export default function StockModal({ stock, onClose, onPrevious, onNext, isFollo
               </span>
             </div>
 
-            {stock.gabo_signal ? (
-              <p className="text-sm text-slate-300">
-                This stock passed the Triple Floor scan — 3 confirmed support floors within 2% of each other, each followed by a bounce of at least 10%.
-              </p>
-            ) : (
+            {loading && (
+              <p className="text-sm text-slate-500">Loading chart data…</p>
+            )}
+
+            {!loading && gaboDetails && (
+              <>
+                {/* Floor table */}
+                <div className="mb-4 overflow-hidden rounded-xl border border-slate-700/60">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-700/60 bg-slate-800/60">
+                        <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Floor</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Date</th>
+                        <th className="px-4 py-2 text-right text-xs font-medium uppercase tracking-wider text-slate-500">Price</th>
+                        <th className="px-4 py-2 text-right text-xs font-medium uppercase tracking-wider text-slate-500">Bounce</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {gaboDetails.floors.map((f, i) => (
+                        <tr key={i} className="border-b border-slate-700/40 last:border-0">
+                          <td className="px-4 py-2.5 text-slate-400">#{i + 1}</td>
+                          <td className="px-4 py-2.5 text-slate-300">{f.date}</td>
+                          <td className="px-4 py-2.5 text-right font-mono text-slate-300">${f.price.toFixed(2)}</td>
+                          <td className={`px-4 py-2.5 text-right font-mono font-medium ${f.bounce >= 0.08 ? "text-emerald-400" : "text-red-400"}`}>
+                            +{(f.bounce * 100).toFixed(1)}%
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Algorithm check */}
+                <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 px-4 py-3 space-y-2">
+                  <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">Algorithm Check</h4>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-slate-400">Avg Floor Price</span>
+                    <span className="font-mono text-slate-200">${gaboDetails.avgFloor.toFixed(2)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-slate-400">Floor Variance</span>
+                    <span className={`font-mono font-medium ${gaboDetails.variance <= 0.03 ? "text-emerald-400" : "text-red-400"}`}>
+                      {(gaboDetails.variance * 100).toFixed(2)}%
+                      <span className="ml-1.5 text-xs text-slate-500">
+                        ({gaboDetails.variance <= 0.03 ? "PASSED" : "FAILED"} ±3%)
+                      </span>
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-slate-400">Avg Bounce</span>
+                    <span className={`font-mono font-medium ${gaboDetails.avgBounce >= 0.08 ? "text-emerald-400" : "text-red-400"}`}>
+                      {(gaboDetails.avgBounce * 100).toFixed(1)}%
+                      <span className="ml-1.5 text-xs text-slate-500">
+                        ({gaboDetails.avgBounce >= 0.08 ? "PASSED" : "FAILED"} ≥8%)
+                      </span>
+                    </span>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {!loading && !gaboDetails && (
               <p className="text-sm text-slate-500">
-                This stock did not meet the Triple Floor criteria. Either the 3 most recent troughs are too far apart in price (&gt;2% variance), or at least one bounce was below 10%.
+                Not enough swing data to display floor details.
               </p>
             )}
           </div>
