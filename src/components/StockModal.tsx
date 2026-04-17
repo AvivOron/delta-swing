@@ -93,8 +93,6 @@ const DELTA = 0.05;
 const BUY_TOLERANCE = 0.02;
 const MAX_HISTORY_DAYS = 180;
 const MAX_HISTORY_SECONDS = MAX_HISTORY_DAYS * 24 * 60 * 60;
-const FLOOR_VARIANCE_LIMIT = 0.02; // ±2%
-const MIN_BOUNCE_PCT = 0.10; // ≥10%
 const TIMEFRAME_OPTIONS = [
   { key: "1M", label: "1M", points: 21 },
   { key: "3M", label: "3M", points: 63 },
@@ -103,70 +101,6 @@ const TIMEFRAME_OPTIONS = [
 
 type TimeframeKey = (typeof TIMEFRAME_OPTIONS)[number]["key"];
 type ModalTab = "analysis" | "gabo";
-
-interface GaboFloor {
-  price: number;
-  date: string;
-  bounce: number; // % gain to next peak
-}
-
-interface GaboResult {
-  passed: boolean;
-  floors: GaboFloor[];
-  variance: number; // % range between min and max floor price
-  avgFloor: number;
-  avgBounce: number;
-  failReason: string | null;
-}
-
-function runGaboFormula(pivots: Pivot[]): GaboResult | null {
-  // Need at least 3 lows each followed by a high
-  const lows = pivots.filter((p) => p.direction === "low");
-  if (lows.length < 3) return null;
-
-  // Take the 3 most recent lows
-  const recentLows = lows.slice(-3);
-
-  // For each low, find the immediately subsequent high in the full pivots array
-  const floors: GaboFloor[] = [];
-  for (const low of recentLows) {
-    const lowIdx = pivots.findIndex((p) => p.timestamp === low.timestamp);
-    const nextHigh = pivots.slice(lowIdx + 1).find((p) => p.direction === "high");
-    if (!nextHigh) return null; // no subsequent high — can't measure bounce
-    const bounce = (nextHigh.price - low.price) / low.price;
-    floors.push({ price: low.price, date: low.date, bounce });
-  }
-
-  const prices = floors.map((f) => f.price);
-  const minPrice = Math.min(...prices);
-  const maxPrice = Math.max(...prices);
-  const avgFloor = prices.reduce((a, b) => a + b, 0) / prices.length;
-  // Variance = (max - min) / avg expressed as %
-  const variance = (maxPrice - minPrice) / avgFloor;
-
-  const avgBounce = floors.reduce((a, f) => a + f.bounce, 0) / floors.length;
-
-  const variancePassed = variance <= FLOOR_VARIANCE_LIMIT;
-  const bouncePassed = floors.every((f) => f.bounce >= MIN_BOUNCE_PCT);
-
-  let failReason: string | null = null;
-  if (!variancePassed && !bouncePassed) {
-    failReason = `Floor variance ${(variance * 100).toFixed(1)}% exceeds ±2% limit and bounces below 10% requirement.`;
-  } else if (!variancePassed) {
-    failReason = `Floor variance ${(variance * 100).toFixed(1)}% exceeds the ±2% limit.`;
-  } else if (!bouncePassed) {
-    failReason = `Average bounce ${(avgBounce * 100).toFixed(1)}% is below the 10% requirement.`;
-  }
-
-  return {
-    passed: variancePassed && bouncePassed,
-    floors,
-    variance,
-    avgFloor,
-    avgBounce,
-    failReason,
-  };
-}
 
 const PivotDot = (props: any) => {
   const { cx, cy, payload } = props;
@@ -341,7 +275,6 @@ export default function StockModal({ stock, onClose, onPrevious, onNext, isFollo
     }
   }
 
-  const gaboResult = loading ? null : runGaboFormula(pivots);
 
   const bullets: string[] = [];
   if (pivots.length >= 2) {
@@ -692,88 +625,25 @@ export default function StockModal({ stock, onClose, onPrevious, onNext, isFollo
                   3 most recent troughs within ±2% of each other, each followed by a ≥10% bounce.
                 </p>
               </div>
-              {gaboResult && (
-                <span
-                  className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider ${
-                    gaboResult.passed
-                      ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
-                      : "bg-red-500/15 text-red-400 border border-red-500/30"
-                  }`}
-                >
-                  {gaboResult.passed ? "✓ Matched" : "✕ Rejected"}
-                </span>
-              )}
+              <span
+                className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider ${
+                  stock.gabo_signal
+                    ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
+                    : "bg-red-500/15 text-red-400 border border-red-500/30"
+                }`}
+              >
+                {stock.gabo_signal ? "✓ Matched" : "✕ Rejected"}
+              </span>
             </div>
 
-            {loading && (
-              <p className="text-sm text-slate-500">Loading chart data…</p>
-            )}
-
-            {!loading && !gaboResult && (
-              <p className="text-sm text-slate-500">
-                Not enough swing data — fewer than 3 troughs detected in the last 6 months.
+            {stock.gabo_signal ? (
+              <p className="text-sm text-slate-300">
+                This stock passed the Triple Floor scan — 3 confirmed support floors within 2% of each other, each followed by a bounce of at least 10%.
               </p>
-            )}
-
-            {!loading && gaboResult && (
-              <>
-                {/* Floor table */}
-                <div className="mb-4 overflow-hidden rounded-xl border border-slate-700/60">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-slate-700/60 bg-slate-800/60">
-                        <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Floor</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Date</th>
-                        <th className="px-4 py-2 text-right text-xs font-medium uppercase tracking-wider text-slate-500">Price</th>
-                        <th className="px-4 py-2 text-right text-xs font-medium uppercase tracking-wider text-slate-500">Bounce</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {gaboResult.floors.map((f, i) => (
-                        <tr key={i} className="border-b border-slate-700/40 last:border-0">
-                          <td className="px-4 py-2.5 text-slate-400">#{i + 1}</td>
-                          <td className="px-4 py-2.5 text-slate-300">{f.date}</td>
-                          <td className="px-4 py-2.5 text-right font-mono text-slate-300">${f.price.toFixed(2)}</td>
-                          <td className={`px-4 py-2.5 text-right font-mono font-medium ${f.bounce >= MIN_BOUNCE_PCT ? "text-emerald-400" : "text-red-400"}`}>
-                            +{(f.bounce * 100).toFixed(1)}%
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Algorithm check */}
-                <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 px-4 py-3 space-y-2">
-                  <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">Algorithm Check</h4>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-slate-400">Avg Floor Price</span>
-                    <span className="font-mono text-slate-200">${gaboResult.avgFloor.toFixed(2)}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-slate-400">Floor Variance</span>
-                    <span className={`font-mono font-medium ${gaboResult.variance <= FLOOR_VARIANCE_LIMIT ? "text-emerald-400" : "text-red-400"}`}>
-                      {(gaboResult.variance * 100).toFixed(2)}%
-                      <span className="ml-1.5 text-xs text-slate-500">
-                        ({gaboResult.variance <= FLOOR_VARIANCE_LIMIT ? "PASSED" : "FAILED"} ±2%)
-                      </span>
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-slate-400">Avg Bounce</span>
-                    <span className={`font-mono font-medium ${gaboResult.avgBounce >= MIN_BOUNCE_PCT ? "text-emerald-400" : "text-red-400"}`}>
-                      {(gaboResult.avgBounce * 100).toFixed(1)}%
-                      <span className="ml-1.5 text-xs text-slate-500">
-                        ({gaboResult.avgBounce >= MIN_BOUNCE_PCT ? "PASSED" : "FAILED"} &gt;10%)
-                      </span>
-                    </span>
-                  </div>
-                </div>
-
-                {gaboResult.failReason && (
-                  <p className="mt-3 text-sm text-red-400">{gaboResult.failReason}</p>
-                )}
-              </>
+            ) : (
+              <p className="text-sm text-slate-500">
+                This stock did not meet the Triple Floor criteria. Either the 3 most recent troughs are too far apart in price (&gt;2% variance), or at least one bounce was below 10%.
+              </p>
             )}
           </div>
         )}

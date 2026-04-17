@@ -47,8 +47,8 @@ MIN_OCCURRENCES: int = 3     # minimum qualifying swings
 LOOKBACK_DAYS: int = 180     # calendar days of history to fetch
 BUY_ZONE_TOLERANCE: float = 0.02  # within 2% of last pivot low
 MAX_WORKERS: int = 16        # tune for Pi 4/5 — IO-bound so can exceed core count
-GABO_FLOOR_VARIANCE: float = 0.02  # ±2% max spread between the 3 floor prices
-GABO_MIN_BOUNCE: float = 0.10      # each floor must bounce ≥10% to next peak
+GABO_FLOOR_VARIANCE: float = 0.03  # ±3% max spread between the 3 floor prices
+GABO_MIN_BOUNCE: float = 0.08      # each floor must bounce ≥8% to next peak
 
 logging.basicConfig(
     level=logging.INFO,
@@ -110,7 +110,6 @@ def calculate_zigzag(closes: pd.Series, delta: float) -> list:
                 last_direction = "high"
                 last_pivot_price = p
             elif p > last_pivot_price:
-                # extend the existing peak
                 pivots[-1] = {"index": i, "price": p, "direction": "high"}
                 last_pivot_price = p
 
@@ -120,9 +119,18 @@ def calculate_zigzag(closes: pd.Series, delta: float) -> list:
                 last_direction = "low"
                 last_pivot_price = p
             elif p < last_pivot_price:
-                # extend the existing trough
                 pivots[-1] = {"index": i, "price": p, "direction": "low"}
                 last_pivot_price = p
+
+        elif last_direction == "low" and p < last_pivot_price:
+            # dipped lower within current low swing without crossing -delta from last_pivot_price
+            pivots[-1] = {"index": i, "price": p, "direction": "low"}
+            last_pivot_price = p
+
+        elif last_direction == "high" and p > last_pivot_price:
+            # pushed higher within current high swing without crossing +delta from last_pivot_price
+            pivots[-1] = {"index": i, "price": p, "direction": "high"}
+            last_pivot_price = p
 
     return pivots
 
