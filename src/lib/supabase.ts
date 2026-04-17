@@ -10,5 +10,6 @@ export interface StockRow {
   price: number;
   swings_count: number;
   is_buy_zone: boolean;
+  gabo_signal: boolean;
   last_updated: string; // ISO 8601
 }

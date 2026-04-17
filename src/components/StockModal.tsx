@@ -93,6 +93,8 @@ const DELTA = 0.05;
 const BUY_TOLERANCE = 0.02;
 const MAX_HISTORY_DAYS = 180;
 const MAX_HISTORY_SECONDS = MAX_HISTORY_DAYS * 24 * 60 * 60;
+const FLOOR_VARIANCE_LIMIT = 0.02; // ±2%
+const MIN_BOUNCE_PCT = 0.10; // ≥10%
 const TIMEFRAME_OPTIONS = [
   { key: "1M", label: "1M", points: 21 },
   { key: "3M", label: "3M", points: 63 },
@@ -100,6 +102,71 @@ const TIMEFRAME_OPTIONS = [
 ] as const;
 
 type TimeframeKey = (typeof TIMEFRAME_OPTIONS)[number]["key"];
+type ModalTab = "analysis" | "gabo";
+
+interface GaboFloor {
+  price: number;
+  date: string;
+  bounce: number; // % gain to next peak
+}
+
+interface GaboResult {
+  passed: boolean;
+  floors: GaboFloor[];
+  variance: number; // % range between min and max floor price
+  avgFloor: number;
+  avgBounce: number;
+  failReason: string | null;
+}
+
+function runGaboFormula(pivots: Pivot[]): GaboResult | null {
+  // Need at least 3 lows each followed by a high
+  const lows = pivots.filter((p) => p.direction === "low");
+  if (lows.length < 3) return null;
+
+  // Take the 3 most recent lows
+  const recentLows = lows.slice(-3);
+
+  // For each low, find the immediately subsequent high in the full pivots array
+  const floors: GaboFloor[] = [];
+  for (const low of recentLows) {
+    const lowIdx = pivots.findIndex((p) => p.timestamp === low.timestamp);
+    const nextHigh = pivots.slice(lowIdx + 1).find((p) => p.direction === "high");
+    if (!nextHigh) return null; // no subsequent high — can't measure bounce
+    const bounce = (nextHigh.price - low.price) / low.price;
+    floors.push({ price: low.price, date: low.date, bounce });
+  }
+
+  const prices = floors.map((f) => f.price);
+  const minPrice = Math.min(...prices);
+  const maxPrice = Math.max(...prices);
+  const avgFloor = prices.reduce((a, b) => a + b, 0) / prices.length;
+  // Variance = (max - min) / avg expressed as %
+  const variance = (maxPrice - minPrice) / avgFloor;
+
+  const avgBounce = floors.reduce((a, f) => a + f.bounce, 0) / floors.length;
+
+  const variancePassed = variance <= FLOOR_VARIANCE_LIMIT;
+  const bouncePassed = floors.every((f) => f.bounce >= MIN_BOUNCE_PCT);
+
+  let failReason: string | null = null;
+  if (!variancePassed && !bouncePassed) {
+    failReason = `Floor variance ${(variance * 100).toFixed(1)}% exceeds ±2% limit and bounces below 10% requirement.`;
+  } else if (!variancePassed) {
+    failReason = `Floor variance ${(variance * 100).toFixed(1)}% exceeds the ±2% limit.`;
+  } else if (!bouncePassed) {
+    failReason = `Average bounce ${(avgBounce * 100).toFixed(1)}% is below the 10% requirement.`;
+  }
+
+  return {
+    passed: variancePassed && bouncePassed,
+    floors,
+    variance,
+    avgFloor,
+    avgBounce,
+    failReason,
+  };
+}
 
 const PivotDot = (props: any) => {
   const { cx, cy, payload } = props;
@@ -128,6 +195,7 @@ export default function StockModal({ stock, onClose, onPrevious, onNext, isFollo
   const [geminiText, setGeminiText] = useState<string | null>(null);
   const [geminiError, setGeminiError] = useState<string | null>(null);
   const [timeframe, setTimeframe] = useState<TimeframeKey>("6M");
+  const [activeTab, setActiveTab] = useState<ModalTab>("analysis");
   const [buyPrice, setBuyPrice] = useState("");
   const [sellLoading, setSellLoading] = useState(false);
   const [sellText, setSellText] = useState<string | null>(null);
@@ -143,6 +211,7 @@ export default function StockModal({ stock, onClose, onPrevious, onNext, isFollo
 
   useEffect(() => {
     setTimeframe("6M");
+    setActiveTab("analysis");
     setGeminiText(null);
     setGeminiError(null);
     setSellText(null);
@@ -271,6 +340,8 @@ export default function StockModal({ stock, onClose, onPrevious, onNext, isFollo
       setGeminiLoading(false);
     }
   }
+
+  const gaboResult = loading ? null : runGaboFormula(pivots);
 
   const bullets: string[] = [];
   if (pivots.length >= 2) {
@@ -489,99 +560,223 @@ export default function StockModal({ stock, onClose, onPrevious, onNext, isFollo
           )}
         </div>
 
-        {/* Signal Analysis */}
-        <div className="px-6 py-4">
-          <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-              Signal Analysis
-            </h3>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Should I Buy?</span>
-              <button
-                onClick={askGemini}
-                disabled={geminiLoading || loading}
-                className="flex items-center gap-1.5 rounded-lg border border-indigo-500/40 bg-indigo-600/10 px-3 py-1.5 text-xs font-medium text-indigo-300 hover:bg-indigo-600/20 hover:text-indigo-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                {geminiLoading ? (
-                  <>
-                    <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-                    </svg>
-                    Asking…
-                  </>
-                ) : (
-                  <>✦ Ask Gemini</>
+        {/* Tab bar */}
+        <div className="flex border-b border-slate-700/60">
+          <button
+            type="button"
+            onClick={() => setActiveTab("analysis")}
+            className={`px-6 py-3 text-xs font-semibold uppercase tracking-wider transition-colors ${
+              activeTab === "analysis"
+                ? "border-b-2 border-indigo-500 text-indigo-400"
+                : "text-slate-500 hover:text-slate-300"
+            }`}
+          >
+            Signal Analysis
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("gabo")}
+            className={`px-6 py-3 text-xs font-semibold uppercase tracking-wider transition-colors ${
+              activeTab === "gabo"
+                ? "border-b-2 border-indigo-500 text-indigo-400"
+                : "text-slate-500 hover:text-slate-300"
+            }`}
+          >
+            The Gabo Formula
+          </button>
+        </div>
+
+        {/* Signal Analysis Tab */}
+        {activeTab === "analysis" && (
+          <>
+            <div className="px-6 py-4">
+              <div className="mb-2 flex items-center justify-between">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                  Should I Buy?
+                </h3>
+                <button
+                  onClick={askGemini}
+                  disabled={geminiLoading || loading}
+                  className="flex items-center gap-1.5 rounded-lg border border-indigo-500/40 bg-indigo-600/10 px-3 py-1.5 text-xs font-medium text-indigo-300 hover:bg-indigo-600/20 hover:text-indigo-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  {geminiLoading ? (
+                    <>
+                      <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                      </svg>
+                      Asking…
+                    </>
+                  ) : (
+                    <>✦ Ask Gemini</>
+                  )}
+                </button>
+              </div>
+              <ul className="space-y-1.5">
+                {bullets.map((b, i) => (
+                  <li key={i} className="flex gap-2 text-sm text-slate-300">
+                    <span className={stock.is_buy_zone && i === bullets.length - 1 ? "text-emerald-400" : "text-indigo-400"}>
+                      •
+                    </span>
+                    {b}
+                  </li>
+                ))}
+                {bullets.length === 0 && !loading && (
+                  <li className="text-sm text-slate-500">Not enough pivot data to explain signal.</li>
                 )}
-              </button>
-            </div>
-          </div>
-          <ul className="space-y-1.5">
-            {bullets.map((b, i) => (
-              <li key={i} className="flex gap-2 text-sm text-slate-300">
-                <span className={stock.is_buy_zone && i === bullets.length - 1 ? "text-emerald-400" : "text-indigo-400"}>
-                  •
-                </span>
-                {b}
-              </li>
-            ))}
-            {bullets.length === 0 && !loading && (
-              <li className="text-sm text-slate-500">Not enough pivot data to explain signal.</li>
-            )}
-          </ul>
+              </ul>
 
-          {geminiError && (
-            <p className="mt-3 text-sm text-red-400">{geminiError}</p>
-          )}
-
-          {geminiText && (
-            <div className="mt-3 rounded-xl border border-indigo-500/20 bg-indigo-950/30 px-4 py-3 text-sm text-slate-300 leading-relaxed prose prose-invert prose-sm max-w-none">
-              <ReactMarkdown>{geminiText}</ReactMarkdown>
-            </div>
-          )}
-        </div>
-
-        {/* Should I Sell? */}
-        <div className="border-t border-slate-700/60 px-6 py-4">
-          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
-            Should I Sell?
-          </h3>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-slate-300">I bought at</span>
-            <input
-              type="number"
-              min="0"
-              step="any"
-              placeholder="$0.00"
-              value={buyPrice}
-              onChange={(e) => setBuyPrice(e.target.value)}
-              className="w-28 rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-sm text-slate-100 placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
-            />
-            <button
-              onClick={askSell}
-              disabled={sellLoading || loading || !buyPrice || isNaN(parseFloat(buyPrice)) || parseFloat(buyPrice) <= 0}
-              className="flex items-center gap-1.5 rounded-lg border border-indigo-500/40 bg-indigo-600/10 px-3 py-1.5 text-xs font-medium text-indigo-300 hover:bg-indigo-600/20 hover:text-indigo-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            >
-              {sellLoading ? (
-                <>
-                  <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-                  </svg>
-                  Asking…
-                </>
-              ) : (
-                <>✦ Ask Gemini</>
+              {geminiError && (
+                <p className="mt-3 text-sm text-red-400">{geminiError}</p>
               )}
-            </button>
-          </div>
-          {sellError && <p className="mt-3 text-sm text-red-400">{sellError}</p>}
-          {sellText && (
-            <div className="mt-3 rounded-xl border border-indigo-500/20 bg-indigo-950/30 px-4 py-3 text-sm text-slate-300 leading-relaxed prose prose-invert prose-sm max-w-none">
-              <ReactMarkdown>{sellText}</ReactMarkdown>
+
+              {geminiText && (
+                <div className="mt-3 rounded-xl border border-indigo-500/20 bg-indigo-950/30 px-4 py-3 text-sm text-slate-300 leading-relaxed prose prose-invert prose-sm max-w-none">
+                  <ReactMarkdown>{geminiText}</ReactMarkdown>
+                </div>
+              )}
             </div>
-          )}
-        </div>
+
+            <div className="border-t border-slate-700/60 px-6 py-4">
+              <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
+                Should I Sell?
+              </h3>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-slate-300">I bought at</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="any"
+                  placeholder="$0.00"
+                  value={buyPrice}
+                  onChange={(e) => setBuyPrice(e.target.value)}
+                  className="w-28 rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-sm text-slate-100 placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
+                />
+                <button
+                  onClick={askSell}
+                  disabled={sellLoading || loading || !buyPrice || isNaN(parseFloat(buyPrice)) || parseFloat(buyPrice) <= 0}
+                  className="flex items-center gap-1.5 rounded-lg border border-indigo-500/40 bg-indigo-600/10 px-3 py-1.5 text-xs font-medium text-indigo-300 hover:bg-indigo-600/20 hover:text-indigo-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  {sellLoading ? (
+                    <>
+                      <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                      </svg>
+                      Asking…
+                    </>
+                  ) : (
+                    <>✦ Ask Gemini</>
+                  )}
+                </button>
+              </div>
+              {sellError && <p className="mt-3 text-sm text-red-400">{sellError}</p>}
+              {sellText && (
+                <div className="mt-3 rounded-xl border border-indigo-500/20 bg-indigo-950/30 px-4 py-3 text-sm text-slate-300 leading-relaxed prose prose-invert prose-sm max-w-none">
+                  <ReactMarkdown>{sellText}</ReactMarkdown>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* Gabo Formula Tab */}
+        {activeTab === "gabo" && (
+          <div className="px-6 py-4">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                  Triple Floor Volatility Algorithm
+                </h3>
+                <p className="mt-1 text-xs text-slate-500">
+                  3 most recent troughs within ±2% of each other, each followed by a ≥10% bounce.
+                </p>
+              </div>
+              {gaboResult && (
+                <span
+                  className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider ${
+                    gaboResult.passed
+                      ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
+                      : "bg-red-500/15 text-red-400 border border-red-500/30"
+                  }`}
+                >
+                  {gaboResult.passed ? "✓ Matched" : "✕ Rejected"}
+                </span>
+              )}
+            </div>
+
+            {loading && (
+              <p className="text-sm text-slate-500">Loading chart data…</p>
+            )}
+
+            {!loading && !gaboResult && (
+              <p className="text-sm text-slate-500">
+                Not enough swing data — fewer than 3 troughs detected in the last 6 months.
+              </p>
+            )}
+
+            {!loading && gaboResult && (
+              <>
+                {/* Floor table */}
+                <div className="mb-4 overflow-hidden rounded-xl border border-slate-700/60">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-700/60 bg-slate-800/60">
+                        <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Floor</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Date</th>
+                        <th className="px-4 py-2 text-right text-xs font-medium uppercase tracking-wider text-slate-500">Price</th>
+                        <th className="px-4 py-2 text-right text-xs font-medium uppercase tracking-wider text-slate-500">Bounce</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {gaboResult.floors.map((f, i) => (
+                        <tr key={i} className="border-b border-slate-700/40 last:border-0">
+                          <td className="px-4 py-2.5 text-slate-400">#{i + 1}</td>
+                          <td className="px-4 py-2.5 text-slate-300">{f.date}</td>
+                          <td className="px-4 py-2.5 text-right font-mono text-slate-300">${f.price.toFixed(2)}</td>
+                          <td className={`px-4 py-2.5 text-right font-mono font-medium ${f.bounce >= MIN_BOUNCE_PCT ? "text-emerald-400" : "text-red-400"}`}>
+                            +{(f.bounce * 100).toFixed(1)}%
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Algorithm check */}
+                <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 px-4 py-3 space-y-2">
+                  <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">Algorithm Check</h4>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-slate-400">Avg Floor Price</span>
+                    <span className="font-mono text-slate-200">${gaboResult.avgFloor.toFixed(2)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-slate-400">Floor Variance</span>
+                    <span className={`font-mono font-medium ${gaboResult.variance <= FLOOR_VARIANCE_LIMIT ? "text-emerald-400" : "text-red-400"}`}>
+                      {(gaboResult.variance * 100).toFixed(2)}%
+                      <span className="ml-1.5 text-xs text-slate-500">
+                        ({gaboResult.variance <= FLOOR_VARIANCE_LIMIT ? "PASSED" : "FAILED"} ±2%)
+                      </span>
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-slate-400">Avg Bounce</span>
+                    <span className={`font-mono font-medium ${gaboResult.avgBounce >= MIN_BOUNCE_PCT ? "text-emerald-400" : "text-red-400"}`}>
+                      {(gaboResult.avgBounce * 100).toFixed(1)}%
+                      <span className="ml-1.5 text-xs text-slate-500">
+                        ({gaboResult.avgBounce >= MIN_BOUNCE_PCT ? "PASSED" : "FAILED"} &gt;10%)
+                      </span>
+                    </span>
+                  </div>
+                </div>
+
+                {gaboResult.failReason && (
+                  <p className="mt-3 text-sm text-red-400">{gaboResult.failReason}</p>
+                )}
+              </>
+            )}
+          </div>
+        )}
 
         {/* Footer */}
         <div className="border-t border-slate-700/60 px-6 py-3 text-xs text-slate-600">

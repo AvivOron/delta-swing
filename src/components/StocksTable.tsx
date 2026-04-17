@@ -18,7 +18,7 @@ const FOLLOWED_STORAGE_KEY = "delta-swing-followed";
 export default function StocksTable({ stocks }: StocksTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>("swings_count");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
-  const [filter, setFilter] = useState<"all" | "buy" | "followed">("all");
+  const [filter, setFilter] = useState<"all" | "buy" | "gabo" | "followed">("all");
   const [minPrice, setMinPrice] = useState("");
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<StockRow | null>(null);
@@ -60,6 +60,7 @@ export default function StocksTable({ stocks }: StocksTableProps) {
   const visible = stocks
     .filter((s) => {
       if (filter === "buy") return s.is_buy_zone;
+      if (filter === "gabo") return s.gabo_signal;
       if (filter === "followed") return followedTickers.has(s.ticker);
       return true;
     })
@@ -72,8 +73,9 @@ export default function StocksTable({ stocks }: StocksTableProps) {
       return sortDir === "asc" ? cmp : -cmp;
     });
   const buySignalsTotal = stocks.filter((s) => s.is_buy_zone).length;
-  const baseCount = filter === "buy" ? buySignalsTotal : stocks.length;
-  const countLabel = filter === "buy" ? "Buy Signal stocks" : "stocks";
+  const gaboTotal = stocks.filter((s) => s.gabo_signal).length;
+  const baseCount = filter === "buy" ? buySignalsTotal : filter === "gabo" ? gaboTotal : stocks.length;
+  const countLabel = filter === "buy" ? "Buy Signal stocks" : filter === "gabo" ? "Gabo Formula stocks" : "stocks";
 
   const page = visible.slice(0, limit);
   const hasMore = limit < visible.length;
@@ -188,6 +190,16 @@ export default function StocksTable({ stocks }: StocksTableProps) {
             }`}
           >
             Buy Signals ({stocks.filter((s) => s.is_buy_zone).length})
+          </button>
+          <button
+            onClick={() => setFilter("gabo")}
+            className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+              filter === "gabo"
+                ? "bg-violet-600 text-white"
+                : "bg-slate-800 text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            Gabo Formula ({gaboTotal})
           </button>
           <button
             onClick={() => setFilter("followed")}
