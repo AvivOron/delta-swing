@@ -27,6 +27,7 @@ interface ChartPoint {
 
 interface Pivot {
   date: string;
+  timestamp: number;
   price: number;
   direction: "high" | "low";
 }
@@ -37,26 +38,35 @@ function calculateZigzag(data: ChartPoint[], delta: number): Pivot[] {
   let lastPrice = data[0].price;
   let lastDir: "high" | "low" | null = null;
 
-  for (const point of data.slice(1)) {
-    const change = (point.price - lastPrice) / lastPrice;
+  for (let i = 1; i < data.length; i++) {
+    const change = (data[i].price - lastPrice) / lastPrice;
     if (change >= delta) {
       if (lastDir !== "high") {
-        pivots.push({ date: point.date, price: point.price, direction: "high" });
+        pivots.push({ date: data[i].date, timestamp: data[i].timestamp, price: data[i].price, direction: "high" });
         lastDir = "high";
-        lastPrice = point.price;
-      } else if (point.price > lastPrice) {
-        pivots[pivots.length - 1] = { date: point.date, price: point.price, direction: "high" };
-        lastPrice = point.price;
+        lastPrice = data[i].price;
+      } else if (data[i].price > lastPrice) {
+        pivots[pivots.length - 1] = { date: data[i].date, timestamp: data[i].timestamp, price: data[i].price, direction: "high" };
+        lastPrice = data[i].price;
       }
     } else if (change <= -delta) {
       if (lastDir !== "low") {
-        pivots.push({ date: point.date, price: point.price, direction: "low" });
+        pivots.push({ date: data[i].date, timestamp: data[i].timestamp, price: data[i].price, direction: "low" });
         lastDir = "low";
-        lastPrice = point.price;
-      } else if (point.price < lastPrice) {
-        pivots[pivots.length - 1] = { date: point.date, price: point.price, direction: "low" };
-        lastPrice = point.price;
+        lastPrice = data[i].price;
+      } else if (data[i].price < lastPrice) {
+        // Extend the low to the new minimum regardless of delta magnitude
+        pivots[pivots.length - 1] = { date: data[i].date, timestamp: data[i].timestamp, price: data[i].price, direction: "low" };
+        lastPrice = data[i].price;
       }
+    } else if (lastDir === "low" && data[i].price < lastPrice) {
+      // Price dipped lower within the current low swing but didn't cross -delta from lastPrice
+      pivots[pivots.length - 1] = { date: data[i].date, timestamp: data[i].timestamp, price: data[i].price, direction: "low" };
+      lastPrice = data[i].price;
+    } else if (lastDir === "high" && data[i].price > lastPrice) {
+      // Price pushed higher within the current high swing but didn't cross +delta from lastPrice
+      pivots[pivots.length - 1] = { date: data[i].date, timestamp: data[i].timestamp, price: data[i].price, direction: "high" };
+      lastPrice = data[i].price;
     }
   }
   return pivots;
@@ -168,15 +178,16 @@ export default function StockModal({ stock, onClose, onPrevious, onNext, isFollo
   const pivots = calculateZigzag(history, DELTA);
   const timeframePoints = TIMEFRAME_OPTIONS.find((option) => option.key === timeframe)?.points ?? null;
   const visibleHistory = timeframePoints ? history.slice(-timeframePoints) : history;
-  const visiblePivots = calculateZigzag(visibleHistory, DELTA);
+  const visibleTimestamps = new Set(visibleHistory.map((p) => p.timestamp));
+  const visiblePivots = pivots.filter((p) => visibleTimestamps.has(p.timestamp));
 
   // Merge pivot markers into chart data, and add zigzag line values
-  const pivotDates = new Set(visiblePivots.map((p) => p.date));
+  const pivotTimestamps = new Set(visiblePivots.map((p) => p.timestamp));
   const chartData: ChartPoint[] = visibleHistory.map((p) => {
-    const pivot = visiblePivots.find((pv) => pv.date === p.date);
+    const pivot = visiblePivots.find((pv) => pv.timestamp === p.timestamp);
     return {
       ...p,
-      zigzag: pivotDates.has(p.date) ? p.price : undefined,
+      zigzag: pivotTimestamps.has(p.timestamp) ? p.price : undefined,
       ...(pivot?.direction === "high" ? { pivotHigh: p.price } : {}),
       ...(pivot?.direction === "low" ? { pivotLow: p.price } : {}),
     };
